@@ -288,7 +288,15 @@ export function NotesPage() {
                     <div className="nl-item-preview">{preview(note.content)}</div>
                     <div className="nl-item-meta">
                       <span>{fmtDate(note.updated_at)}</span>
-                      <button className="nl-star-btn" onClick={e => toggleStar(note, e)}><StarIcon filled={note.is_starred}/></button>
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        <button className="nl-star-btn" onClick={e => toggleStar(note, e)}><StarIcon filled={note.is_starred}/></button>
+                        <button className="nl-star-btn nl-delete-btn" onClick={e => { e.stopPropagation(); deleteNote(note); }} title="Удалить">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -301,7 +309,15 @@ export function NotesPage() {
               <div key={note.id} className={`nl-grid-item${selected?.id === note.id ? ' active' : ''}`} onClick={() => openNote(note)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div className="nl-item-title" style={{ flex: 1 }}>{note.title || 'Без названия'}</div>
-                  <button className="nl-star-btn" onClick={e => toggleStar(note, e)}><StarIcon filled={note.is_starred}/></button>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button className="nl-star-btn" onClick={e => toggleStar(note, e)}><StarIcon filled={note.is_starred}/></button>
+                    <button className="nl-star-btn nl-delete-btn" onClick={e => { e.stopPropagation(); deleteNote(note); }} title="Удалить">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="nl-item-preview" style={{ marginTop: 6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {preview(note.content)}

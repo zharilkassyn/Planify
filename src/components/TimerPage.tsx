@@ -154,6 +154,17 @@ export function TimerPage() {
     saveTimerState({ mode, running: false, pausedLeft: t, customMins });
   }
 
+  function adjustTime(delta: number) {
+    const newMins = Math.max(1, Math.min(60, customMins[mode] + delta));
+    const next = { ...customMins, [mode]: newMins };
+    setCustomMins(next);
+    setTimeLeft(newMins * 60);
+    setRunning(false);
+    startedAtRef.current = undefined;
+    totalSecRef.current  = undefined;
+    saveTimerState({ mode, running: false, pausedLeft: newMins * 60, customMins: next });
+  }
+
   function fmtTime(s: number) {
     return `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
   }
@@ -198,12 +209,6 @@ export function TimerPage() {
       <div className="timer-main">
         <div className="dash-header" style={{ marginBottom: 20 }}>
           <h2 style={{ fontSize: 26, fontWeight: 700 }}>Таймер</h2>
-          <button className="bell-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 01-3.46 0"/>
-            </svg>
-          </button>
         </div>
 
         {/* Mode tabs */}
@@ -251,14 +256,18 @@ export function TimerPage() {
         {/* Circle timer */}
         <div className="timer-circle-wrap">
           <div className="timer-circle-label">{MODES[mode].label}</div>
-          <div style={{ position: 'relative', width: 260, height: 260, margin: '0 auto' }}>
-            <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx={CX} cy={CX} r={R} fill="none" stroke="#DBEAFE" strokeWidth="10"/>
-              <circle cx={CX} cy={CX} r={R} fill="none" stroke={mcolor} strokeWidth="10"
-                strokeDasharray={`${arc} ${circ}`} strokeLinecap="round"
-                style={{ transition: 'stroke-dasharray 0.5s' }}/>
-            </svg>
-            <div className="timer-big-time">{fmtTime(timeLeft)}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+            <button className="timer-adj-btn" style={{ background: mcolor + '15', color: mcolor, borderColor: mcolor + '40' }} onClick={() => adjustTime(1)}>+</button>
+            <div style={{ position: 'relative', width: 260, height: 260 }}>
+              <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx={CX} cy={CX} r={R} fill="none" stroke="#DBEAFE" strokeWidth="10"/>
+                <circle cx={CX} cy={CX} r={R} fill="none" stroke={mcolor} strokeWidth="10"
+                  strokeDasharray={`${arc} ${circ}`} strokeLinecap="round"
+                  style={{ transition: 'stroke-dasharray 0.5s' }}/>
+              </svg>
+              <div className="timer-big-time">{fmtTime(timeLeft)}</div>
+            </div>
+            <button className="timer-adj-btn" style={{ background: mcolor + '15', color: mcolor, borderColor: mcolor + '40' }} onClick={() => adjustTime(-1)}>−</button>
           </div>
           <div className="timer-controls">
             <button className="timer-play-btn" style={{ background: mcolor }}
@@ -267,7 +276,8 @@ export function TimerPage() {
                 ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                 : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>}
             </button>
-            <button className="timer-reset-btn" onClick={reset}>
+            <button className="timer-reset-btn" onClick={reset}
+              style={{ background: mcolor + '22', border: `2px solid ${mcolor}60`, color: mcolor }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="1 4 1 10 7 10"/>
                 <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>

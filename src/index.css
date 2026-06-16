@@ -1183,13 +1183,27 @@ button.ghost {
 .timer-reset-btn {
   width: 38px; height: 38px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 2px solid var(--primary);
+  background: var(--primary-mid);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  color: var(--soft);
+  color: var(--primary);
 }
-.timer-reset-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+.timer-reset-btn:hover { background: var(--primary); color: #fff; }
+
+.timer-adj-btn {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 2px solid;
+  font-size: 26px;
+  font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s, opacity 0.15s;
+  line-height: 1;
+}
+.timer-adj-btn:hover { transform: scale(1.1); opacity: 0.85; }
 
 /* Current task */
 .current-task-card {
@@ -2321,7 +2335,12 @@ button.ghost {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 6px; font-size: 11px; color: #CBD5E1;
 }
-.nl-star-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; }
+.nl-star-btn { background: none; border: none; cursor: pointer; padding: 2px; border-radius: 5px; display: flex; align-items: center; color: #CBD5E1; transition: color 0.15s, background 0.15s; }
+.nl-star-btn:hover { background: #F1F5F9; }
+.nl-delete-btn { opacity: 0; transition: opacity 0.15s, color 0.15s, background 0.15s; }
+.nl-item:hover .nl-delete-btn,
+.nl-grid-item:hover .nl-delete-btn { opacity: 1; }
+.nl-delete-btn:hover { color: #EF4444 !important; background: #FEF2F2 !important; }
 .nl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 14px; overflow-y: auto; flex: 1; }
 .nl-grid-item {
   background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;
