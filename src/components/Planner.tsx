@@ -61,7 +61,10 @@ export function Planner() {
 
   const [showHF, setShowHF] = useState(false);
   const [newH,  setNewH]    = useState({ name: '', color: '#2563EB' });
-  const [newTask, setNewTask] = useState('');
+
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskModalTitle, setTaskModalTitle] = useState('');
+  const [taskModalError, setTaskModalError] = useState('');
 
   // ── computed dates ──
   const today    = new Date();
@@ -127,11 +130,21 @@ export function Planner() {
   }
 
   // ── task CRUD ──
-  async function addTask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newTask.trim()) return;
-    const { data } = await supabase.from('entries').insert({ title: newTask.trim() }).select().single();
-    if (data) { setTasks(t => [{ id: data.id, title: data.title, completed: false }, ...t]); setNewTask(''); }
+  async function addTask() {
+    const text = taskModalTitle.trim();
+    if (!text) { setTaskModalError('Введи название задачи'); return; }
+    setTaskModalError('');
+    const { data, error } = await supabase.from('entries').insert({ title: text, completed: false }).select().single();
+    if (error) { setTaskModalError(error.message); return; }
+    if (data) { setTasks(t => [{ id: data.id, title: data.title, completed: false }, ...t]); }
+    setTaskModalTitle('');
+    setShowTaskModal(false);
+  }
+
+  function openTaskModal() {
+    setTaskModalTitle('');
+    setTaskModalError('');
+    setShowTaskModal(true);
   }
 
   async function toggleTask(id: string, completed: boolean) {
@@ -297,6 +310,34 @@ export function Planner() {
 
   return (
     <div className="planner-layout">
+      {showTaskModal && (
+        <div className="modal-overlay" onClick={() => setShowTaskModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Новая задача</span>
+              <button className="modal-close" onClick={() => setShowTaskModal(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <label className="modal-label">Название</label>
+            <input
+              className="modal-input"
+              placeholder="Например: Выучить главу 3…"
+              value={taskModalTitle}
+              autoFocus
+              onChange={e => setTaskModalTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addTask(); }}
+            />
+            {taskModalError && <p className="modal-error">{taskModalError}</p>}
+            <div className="modal-actions">
+              <button className="modal-btn-cancel" onClick={() => setShowTaskModal(false)}>Отмена</button>
+              <button className="modal-btn-add" onClick={addTask}>+ Добавить</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── LEFT ── */}
       <div className="planner-main">
         <div className="dash-header" style={{ marginBottom: 20 }}>
@@ -366,17 +407,12 @@ export function Planner() {
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">Список задач</span>
-            <span className="panel-count">{tasks.length} задач</span>
+            <button className="add-task-btn" style={{ fontSize: 12, padding: '5px 10px' }} onClick={openTaskModal}>+ Добавить</button>
           </div>
           <div className="prog-bar-wrap">
             <div className="prog-bar-track"><div className="prog-bar-fill" style={{ width: `${pct}%` }} /></div>
             <span className="prog-pct">{pct}%</span>
           </div>
-          <form onSubmit={addTask} style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            <input className="planner-input" style={{ flex: 1, width: 'auto' }} placeholder="Новая задача…"
-              value={newTask} onChange={e => setNewTask(e.target.value)} />
-            <button type="submit" className="add-task-btn" style={{ padding: '7px 10px' }}>+</button>
-          </form>
           <div className="check-list">
             {tasks.length === 0 && <p style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '12px 0' }}>Задач нет. Добавь первую!</p>}
             {tasks.map(t => (

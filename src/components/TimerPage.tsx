@@ -62,6 +62,18 @@ export function TimerPage() {
     return saved.totalSec - elapsed > 0;
   });
 
+  const [themeColor, setThemeColor] = useState(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB'
+  );
+
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setThemeColor(getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB');
+    });
+    obs.observe(document.documentElement, { attributes: true });
+    return () => obs.disconnect();
+  }, []);
+
   const [cycles,      setCycles]      = useState(0);
   const [sessionSec,  setSessionSec]  = useState(0);
   const [todaySec,    setTodaySec]    = useState(0);
@@ -181,7 +193,8 @@ export function TimerPage() {
   const CX      = 130;
   const circ    = 2 * Math.PI * R;
   const arc     = circ * pct;
-  const mcolor  = MODES[mode].color;
+  const getModeColor = (m: Mode) => m === 'focus' ? themeColor : MODES[m].color;
+  const mcolor  = getModeColor(mode);
 
   const doneTasks = tasks.filter(t => t.completed).length;
   const visibleTasks = showAll ? tasks : tasks.slice(0, 5);
@@ -215,7 +228,7 @@ export function TimerPage() {
         <div className="timer-tabs">
           {(['focus','short','long'] as Mode[]).map(m => (
             <button key={m} className={`timer-tab${mode === m ? ' active' : ''}`}
-              style={mode === m ? { background: MODES[m].color } : {}}
+              style={mode === m ? { background: getModeColor(m) } : {}}
               onClick={() => switchMode(m)}>
               {MODES[m].label}
             </button>
@@ -260,7 +273,7 @@ export function TimerPage() {
             <button className="timer-adj-btn" style={{ background: mcolor + '15', color: mcolor, borderColor: mcolor + '40' }} onClick={() => adjustTime(1)}>+</button>
             <div style={{ position: 'relative', width: 260, height: 260 }}>
               <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx={CX} cy={CX} r={R} fill="none" stroke="#DBEAFE" strokeWidth="10"/>
+                <circle cx={CX} cy={CX} r={R} fill="none" stroke={mcolor + '25'} strokeWidth="10"/>
                 <circle cx={CX} cy={CX} r={R} fill="none" stroke={mcolor} strokeWidth="10"
                   strokeDasharray={`${arc} ${circ}`} strokeLinecap="round"
                   style={{ transition: 'stroke-dasharray 0.5s' }}/>
@@ -430,7 +443,7 @@ export function TimerPage() {
             <div className="focus-stats">
               <div style={{ position: 'relative', width: 110, height: 110, flexShrink: 0 }}>
                 <svg width="110" height="110" viewBox="0 0 110 110" style={{ transform: 'rotate(-90deg)' }}>
-                  <circle cx="55" cy="55" r={rD} fill="none" stroke="#DBEAFE" strokeWidth="10"/>
+                  <circle cx="55" cy="55" r={rD} fill="none" stroke={mcolor + '25'} strokeWidth="10"/>
                   <circle cx="55" cy="55" r={rD} fill="none" stroke={mcolor} strokeWidth="10"
                     strokeDasharray={`${cD * focusPct / 100} ${cD}`} strokeLinecap="round"/>
                   <circle cx="55" cy="55" r={rD} fill="none" stroke="#0D9488" strokeWidth="10"

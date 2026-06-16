@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 
 type Deck = { id: string; name: string; description: string; color: string; created_at: string; card_count?: number };
 type Card = { id: string; deck_id: string; question: string; answer: string };
-type StudyResult = { cardId: string; rating: number };
 
 const COLORS = ['#2563EB','#0D9488','#6366F1','#F59E0B','#EF4444','#10B981','#0284C7','#7C3AED'];
 
@@ -16,7 +15,6 @@ export function FlashCards() {
   const [cardIdx, setCardIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [studyDone, setStudyDone] = useState(false);
-  const [studyResults, setStudyResults] = useState<StudyResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [studiedToday, setStudiedToday] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
@@ -78,6 +76,22 @@ export function FlashCards() {
     setSaving(false);
   }
 
+  async function deleteCard(id: string) {
+    if (!confirm('Удалить карточку?')) return;
+    await supabase.from('flashcards').delete().eq('id', id);
+    setDeckCards(prev => prev.filter(c => c.id !== id));
+    if (selectedDeck) {
+      setDecks(prev => prev.map(d => d.id === selectedDeck.id ? { ...d, card_count: Math.max(0, (d.card_count ?? 1) - 1) } : d));
+    }
+  }
+
+  async function deleteDeck(id: string) {
+    if (!confirm('Удалить колоду и все её карточки?')) return;
+    await supabase.from('flashcards').delete().eq('deck_id', id);
+    await supabase.from('flashcard_decks').delete().eq('id', id);
+    setDecks(prev => prev.filter(d => d.id !== id));
+  }
+
   async function saveCard() {
     if (!cardQ.trim() || !cardA.trim() || !selectedDeck) return;
     setSaving(true);
@@ -93,14 +107,13 @@ export function FlashCards() {
     setSaving(false);
   }
 
-  async function rateCard(rating: number) {
+  async function nextCard() {
     const card = deckCards[cardIdx];
     if (!card) return;
-    await supabase.from('flashcard_reviews').insert({ card_id: card.id, rating });
-    setStudyResults(prev => [...prev, { cardId: card.id, rating }]);
+    await supabase.from('flashcard_reviews').insert({ card_id: card.id, rating: 4 });
     setStudiedToday(p => p + 1);
     setTotalReviews(p => p + 1);
-    if (rating >= 3) setCorrectReviews(p => p + 1);
+    setCorrectReviews(p => p + 1);
     if (cardIdx < deckCards.length - 1) { setCardIdx(p => p + 1); setFlipped(false); }
     else setStudyDone(true);
   }
@@ -113,7 +126,7 @@ export function FlashCards() {
   function startStudy(deck: Deck) {
     setSelectedDeck(deck); loadDeckCards(deck.id);
     setStudyMode(true); setStudyDone(false);
-    setCardIdx(0); setFlipped(false); setStudyResults([]);
+    setCardIdx(0); setFlipped(false);
   }
 
   function endStudy() {
@@ -129,35 +142,24 @@ export function FlashCards() {
     const card = deckCards[cardIdx];
 
     if (studyDone) {
-      const correct = studyResults.filter(r => r.rating >= 3).length;
       return (
         <div className="flashcards-layout">
           <div className="fc-study-done">
             <div className="fc-done-icon">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
             <div style={{ fontSize: 26, fontWeight: 700, color: '#1E293B' }}>Сессия завершена!</div>
             <div style={{ fontSize: 14, color: '#64748B' }}>{selectedDeck.name} · {deckCards.length} карточек</div>
             <div className="fc-done-stats">
-              <div className="fc-done-stat" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                <div style={{ fontSize: 30, fontWeight: 700, color: '#16A34A' }}>{correct}</div>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Правильно</div>
-              </div>
-              <div className="fc-done-stat" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                <div style={{ fontSize: 30, fontWeight: 700, color: '#DC2626' }}>{studyResults.length - correct}</div>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Повторить</div>
-              </div>
-              <div className="fc-done-stat" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
-                <div style={{ fontSize: 30, fontWeight: 700, color: '#2563EB' }}>
-                  {studyResults.length > 0 ? Math.round((correct / studyResults.length) * 100) : 0}%
-                </div>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Точность</div>
+              <div className="fc-done-stat" style={{ background: 'var(--primary-light,#EFF6FF)', border: '1px solid var(--primary-mid,#BFDBFE)' }}>
+                <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--primary)' }}>{deckCards.length}</div>
+                <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>Карточек пройдено</div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button className="fc-btn-secondary" onClick={() => { setCardIdx(0); setFlipped(false); setStudyDone(false); setStudyResults([]); }}>
+              <button className="fc-btn-secondary" onClick={() => { setCardIdx(0); setFlipped(false); setStudyDone(false); }}>
                 Повторить ещё раз
               </button>
               <button className="fc-btn-primary" onClick={endStudy}>К колодам</button>
@@ -184,7 +186,7 @@ export function FlashCards() {
         </div>
 
         <div style={{ background: '#E2E8F0', borderRadius: 4, height: 6 }}>
-          <div style={{ background: '#2563EB', borderRadius: 4, height: '100%', width: `${pct}%`, transition: 'width 0.3s' }}/>
+          <div style={{ background: 'var(--primary)', borderRadius: 4, height: '100%', width: `${pct}%`, transition: 'width 0.3s' }}/>
         </div>
 
         <div className="fc-study-area">
@@ -193,27 +195,28 @@ export function FlashCards() {
               <div className="flip-card-face flip-front">
                 <div className="flip-label">Вопрос</div>
                 <div className="flip-text">{card.question}</div>
-                <div className="flip-hint">Нажми, чтобы увидеть ответ</div>
               </div>
               <div className="flip-card-face flip-back">
-                <div className="flip-label" style={{ color: '#2563EB' }}>Ответ</div>
+                <div className="flip-label" style={{ color: 'var(--primary)' }}>Ответ</div>
                 <div className="flip-text" style={{ color: '#1E293B' }}>{card.answer}</div>
               </div>
             </div>
           </div>
 
-          {flipped ? (
-            <div className="fc-rate-row">
-              <button className="rate-btn rate-no"   onClick={() => rateCard(1)}>Не знаю</button>
-              <button className="rate-btn rate-hard" onClick={() => rateCard(2)}>Сложно</button>
-              <button className="rate-btn rate-ok"   onClick={() => rateCard(3)}>Нормально</button>
-              <button className="rate-btn rate-easy" onClick={() => rateCard(4)}>Легко</button>
-            </div>
-          ) : (
-            <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center' }}>
-              Нажми на карточку, затем оцени сложность
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button className="fc-btn-secondary" onClick={() => setFlipped(v => !v)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+              </svg>
+              {flipped ? 'Свернуть' : 'Развернуть'}
+            </button>
+            <button className="fc-btn-primary" onClick={nextCard}>
+              Следующий
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -269,7 +272,16 @@ export function FlashCards() {
           <div className="fc-cards-grid">
             {deckCards.map((card, i) => (
               <div key={card.id} className="fc-card-item">
-                <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginBottom: 6, letterSpacing: 0.5 }}>#{i + 1}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, letterSpacing: 0.5 }}>#{i + 1}</div>
+                  <button className="fc-delete-btn" onClick={() => deleteCard(card.id)} title="Удалить карточку">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
+                </div>
                 <div style={{ fontWeight: 600, fontSize: 14, color: '#1E293B', marginBottom: 8 }}>{card.question}</div>
                 <div style={{ height: 1, background: '#F1F5F9', marginBottom: 8 }}/>
                 <div style={{ fontSize: 13, color: '#64748B' }}>{card.answer}</div>
@@ -429,7 +441,7 @@ export function FlashCards() {
               <>
                 <div style={{ fontWeight: 600, fontSize: 15, color: '#1E293B' }}>Недавние колоды</div>
                 <div className="fc-decks-grid">
-                  {decks.slice(0, 6).map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy}/>)}
+                  {decks.slice(0, 6).map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck}/>)}
                 </div>
               </>
             )
@@ -453,7 +465,7 @@ export function FlashCards() {
               </div>
             ) : (
               <div className="fc-decks-grid">
-                {decks.map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy}/>)}
+                {decks.map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck}/>)}
                 <div className="fc-deck-card fc-deck-new" onClick={() => setShowNewDeck(true)}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -583,7 +595,7 @@ export function FlashCards() {
   );
 }
 
-function DeckCard({ deck, onOpen, onStudy }: { deck: Deck; onOpen: (d: Deck) => void; onStudy: (d: Deck) => void }) {
+function DeckCard({ deck, onOpen, onStudy, onDelete }: { deck: Deck; onOpen: (d: Deck) => void; onStudy: (d: Deck) => void; onDelete: (id: string) => void }) {
   return (
     <div className="fc-deck-card" onClick={() => onOpen(deck)}>
       <div className="fc-deck-top" style={{ background: deck.color + '20' }}>
@@ -592,7 +604,16 @@ function DeckCard({ deck, onOpen, onStudy }: { deck: Deck; onOpen: (d: Deck) => 
             <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M8 7V5a2 2 0 00-4 0v2"/>
           </svg>
         </div>
-        <div className="fc-deck-count">{deck.card_count} карт.</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="fc-deck-count">{deck.card_count} карт.</div>
+          <button className="fc-delete-btn fc-deck-delete" onClick={e => { e.stopPropagation(); onDelete(deck.id); }} title="Удалить колоду">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div style={{ padding: '12px 14px' }}>
         <div style={{ fontWeight: 600, fontSize: 14, color: '#1E293B', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</div>

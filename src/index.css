@@ -1999,6 +1999,22 @@ button.ghost {
   border-radius: 12px;
   padding: 14px 16px;
 }
+.fc-delete-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.fc-card-item:hover .fc-delete-btn,
+.fc-deck-card:hover .fc-deck-delete { opacity: 1; }
+.fc-delete-btn:hover { color: #EF4444 !important; background: #FEF2F2 !important; }
 
 /* ── Flip card ── */
 .fc-study-area {
@@ -2039,13 +2055,13 @@ button.ghost {
   min-height: 250px;
 }
 .flip-front {
-  background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 60%, #3B82F6 100%);
+  background: var(--primary);
   color: white;
-  box-shadow: 0 8px 32px rgba(37,99,235,.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
 }
 .flip-back {
   background: var(--card);
-  border: 2px solid #DBEAFE;
+  border: 2px solid var(--primary-mid, #DBEAFE);
   color: #1E293B;
   transform: rotateY(180deg);
   box-shadow: 0 8px 32px rgba(0,0,0,.08);

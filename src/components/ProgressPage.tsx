@@ -12,6 +12,11 @@ const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','
 
 function toStr(d: Date) { return d.toISOString().slice(0, 10); }
 function addDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function getDayLabel(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0=Sun
+  return DAY_LABELS[dow === 0 ? 6 : dow - 1];
+}
 function getMondayOf(d: Date): Date {
   const r = new Date(d);
   const dow = r.getDay();
@@ -35,9 +40,9 @@ export function ProgressPage() {
   const [logs,   setLogs]   = useState<Log[]>([]);
 
   const today     = new Date();
-  const weekStart = addDays(today, -6);
+
   const last7     = Array.from({ length: 7 }, (_, i) => toStr(addDays(today, i - 6)));
-  const weekLabel = `${weekStart.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})} – ${today.toLocaleDateString('ru-RU',{day:'numeric',month:'long'})}`;
+
 
   useEffect(() => {
     Promise.all([
@@ -135,7 +140,7 @@ export function ProgressPage() {
               <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
               <line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
-            {weekLabel}
+            {today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         </div>
       </div>
@@ -186,7 +191,7 @@ export function ProgressPage() {
                         {last7.map(d => {
                           const active = hLogs.some(l => l.logged_date === d);
                           return <div key={d} style={{ flex:1, height:28, borderRadius:6, background: active ? col : '#F1F5F9', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color: active ? '#fff' : '#94A3B8' }}>
-                            {new Date(d).toLocaleDateString('ru-RU',{weekday:'narrow'})}
+                            {getDayLabel(d)}
                           </div>;
                         })}
                       </div>
@@ -474,7 +479,7 @@ export function ProgressPage() {
               <polygon points={['30,110',...weekCounts.map((c,i)=>`${30+(i/6)*360},${110-(c/maxCount)*100}`),'390,110'].join(' ')} fill="url(#aG)"/>
               <polyline points={weekCounts.map((c,i)=>`${30+(i/6)*360},${110-(c/maxCount)*100}`).join(' ')} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinejoin="round"/>
               {weekCounts.map((c,i) => <circle key={i} cx={30+(i/6)*360} cy={110-(c/maxCount)*100} r="5" fill="#2563EB"/>)}
-              {DAY_LABELS.map((d,i) => <text key={i} x={30+(i/6)*360} y="132" fontSize="11" fill="#94A3B8" textAnchor="middle">{d}</text>)}
+              {last7.map((d,i) => <text key={i} x={30+(i/6)*360} y="132" fontSize="11" fill="#94A3B8" textAnchor="middle">{getDayLabel(d)}</text>)}
               {[0,2,4,6].map(v => <text key={v} x="24" y={113-(v/maxCount)*100} fontSize="10" fill="#94A3B8" textAnchor="end">{v}</text>)}
             </svg>
           )}
@@ -566,7 +571,7 @@ export function ProgressPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr repeat(7,18px)', gap:4, marginBottom:4 }}>
                 <div/>
-                {DAY_LABELS.map(d => <div key={d} style={{ fontSize:10, color:'#94A3B8', textAlign:'center' }}>{d}</div>)}
+                {last7.map(d => <div key={d} style={{ fontSize:10, color:'#94A3B8', textAlign:'center' }}>{getDayLabel(d)}</div>)}
               </div>
               {habits.slice(0,5).map((h,i) => (
                 <div key={h.id} style={{ display:'grid', gridTemplateColumns:'1fr repeat(7,18px)', gap:4, alignItems:'center' }}>
