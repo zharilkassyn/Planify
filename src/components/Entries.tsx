@@ -3,43 +3,37 @@ import { supabase } from '../lib/supabase';
 
 type Entry = { id: string; title: string; completed: boolean; created_at: string };
 
-const COLORS = ['#2563EB', '#38BDF8', '#10B981', '#F59E0B', '#EF4444'];
+const TASK_COLORS = [
+  '#2563EB', '#6366F1', '#8B5CF6', '#EC4899',
+  '#EF4444', '#F59E0B', '#10B981', '#0D9488',
+];
 
-export function Entries({ userEmail }: { userEmail: string }) {
+export function Entries({ userEmail, onNavigate }: { userEmail: string; onNavigate: (page: string) => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [title, setTitle] = useState('');
-  const [error, setError] = useState('');
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [timeLeft] = useState(25 * 60);
 
   async function load() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('entries')
       .select('id, title, completed, created_at')
       .order('created_at', { ascending: false });
-    if (error) setError(error.message);
-    else setEntries((data ?? []) as Entry[]);
+    if (data) setEntries(data as Entry[]);
   }
 
   useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 0) { setRunning(false); return 0; }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [running]);
-
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    const { error } = await supabase.from('entries').insert({ title: title.trim() });
-    if (error) setError(error.message);
-    else { setTitle(''); load(); }
+  async function add() {
+    const text = newTitle.trim();
+    if (!text) { setModalError('Введи название задачи'); return; }
+    setModalError('');
+    const { error } = await supabase.from('entries').insert({ title: text, completed: false });
+    if (error) { setModalError(error.message); return; }
+    setNewTitle('');
+    setShowModal(false);
+    load();
   }
 
   async function remove(id: string) {
@@ -47,14 +41,23 @@ export function Entries({ userEmail }: { userEmail: string }) {
     load();
   }
 
-  const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-  const secs = String(timeLeft % 60).padStart(2, '0');
+  async function toggle(id: string, completed: boolean) {
+    await supabase.from('entries').update({ completed: !completed }).eq('id', id);
+    load();
+  }
+
+  function openModal() {
+    setNewTitle('');
+    setModalError('');
+    setShowModal(true);
+  }
+
   const total = 25 * 60;
   const progress = (total - timeLeft) / total;
   const r = 54;
   const circ = 2 * Math.PI * r;
 
-  const done = Math.floor(entries.length * 0.6);
+  const done = entries.filter(e => e.completed).length;
   const pct = entries.length > 0 ? Math.round((done / entries.length) * 100) : 0;
   const rp = 40;
   const cp = 2 * Math.PI * rp;
@@ -63,6 +66,41 @@ export function Entries({ userEmail }: { userEmail: string }) {
 
   return (
     <>
+      {/* ── Modal ── */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Новая задача</span>
+              <button className="modal-close" onClick={() => setShowModal(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <label className="modal-label">Название</label>
+            <input
+              className="modal-input"
+              placeholder="Например: Выучить главу 3…"
+              value={newTitle}
+              autoFocus
+              onChange={ev => setNewTitle(ev.target.value)}
+              onKeyDown={ev => { if (ev.key === 'Enter') add(); }}
+            />
+
+            {modalError && <p className="modal-error">{modalError}</p>}
+
+            <div className="modal-actions">
+              <button className="modal-btn-cancel" onClick={() => setShowModal(false)}>Отмена</button>
+              <button className="modal-btn-add" onClick={add}>
+                + Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="dash-header">
         <div className="dash-greeting">
           <h2>Привет, {firstName}! 👋</h2>
@@ -78,7 +116,7 @@ export function Entries({ userEmail }: { userEmail: string }) {
 
       <div className="widgets-row">
         {/* Timer */}
-        <div className="widget">
+        <div className="widget" style={{ cursor: 'pointer' }} onClick={() => onNavigate('Таймер')}>
           <div className="widget-title">Таймер фокусировки</div>
           <div className="timer-circle">
             <svg width="130" height="130" viewBox="0 0 130 130">
@@ -89,17 +127,9 @@ export function Entries({ userEmail }: { userEmail: string }) {
                 transform="rotate(-90 65 65)"
               />
             </svg>
-            <div className="timer-text">{mins}:{secs}</div>
+            <div className="timer-text">25:00</div>
           </div>
-          <button
-            className={`timer-start${running ? ' running' : ''}`}
-            onClick={() => {
-              if (timeLeft === 0) { setTimeLeft(25 * 60); setRunning(true); }
-              else setRunning(r => !r);
-            }}
-          >
-            {running ? 'Стоп' : timeLeft === 0 ? 'Заново' : 'Начать'}
-          </button>
+          <div className="timer-start">Открыть таймер →</div>
         </div>
 
         {/* Schedule */}
@@ -111,7 +141,7 @@ export function Entries({ userEmail }: { userEmail: string }) {
             <div className="schedule-list">
               {entries.slice(0, 5).map((e, i) => (
                 <div key={e.id} className="schedule-item">
-                  <div className="schedule-dot" style={{ background: COLORS[i % COLORS.length] }} />
+                  <div className="schedule-dot" style={{ background: TASK_COLORS[i % TASK_COLORS.length] }} />
                   <span className="schedule-name">{e.title}</span>
                 </div>
               ))}
@@ -149,21 +179,32 @@ export function Entries({ userEmail }: { userEmail: string }) {
       <div className="bottom-row">
         {/* Task list */}
         <div className="widget">
-          <div className="widget-title">Все задачи</div>
-          <form onSubmit={add} className="add-task-form">
-            <input
-              placeholder="Добавить задачу…"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-            />
-            <button type="submit">+ Добавить</button>
-          </form>
-          {error && <p className="message">{error}</p>}
-          <div className="task-list">
+          <div className="widget-header">
+            <span className="widget-title" style={{ marginBottom: 0 }}>Все задачи</span>
+            <button className="add-task-btn" onClick={openModal}>+ Добавить</button>
+          </div>
+          <div className="task-list" style={{ marginTop: 14 }}>
+            {entries.length === 0 && (
+              <p style={{ fontSize: 13, color: 'var(--soft)', textAlign: 'center', padding: '16px 0' }}>
+                Нет задач. Нажми «+ Добавить»!
+              </p>
+            )}
             {entries.map(e => (
-              <div key={e.id} className="task-item">
-                <div className="task-check" />
-                <span>{e.title}</span>
+              <div key={e.id} className={`task-item${e.completed ? ' task-done' : ''}`}>
+                <div
+                  className={`task-check${e.completed ? ' task-check-done' : ''}`}
+                  onClick={() => toggle(e.id, e.completed)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {e.completed && (
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5">
+                      <polyline points="1.5 6 4.5 9 10.5 3"/>
+                    </svg>
+                  )}
+                </div>
+                <span style={{ textDecoration: e.completed ? 'line-through' : 'none', opacity: e.completed ? 0.5 : 1, flex: 1 }}>
+                  {e.title}
+                </span>
                 <button className="task-del" onClick={() => remove(e.id)}>×</button>
               </div>
             ))}
@@ -180,7 +221,7 @@ export function Entries({ userEmail }: { userEmail: string }) {
               { name: 'Заметки', desc: 'Твои конспекты', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
               { name: 'Прогресс', desc: 'Смотри статистику', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
             ].map(a => (
-              <button key={a.name} className="action-card">
+              <button key={a.name} className="action-card" onClick={() => onNavigate(a.name)}>
                 <div className="action-icon">{a.icon}</div>
                 <div className="action-name">{a.name}</div>
                 <div className="action-desc">{a.desc}</div>

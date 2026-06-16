@@ -4,6 +4,17 @@ import { supabase } from '../lib/supabase';
 type Task = { id: string; title: string; completed: boolean };
 type Mode = 'focus' | 'short' | 'long';
 
+const TIMER_KEY = 'planify_timer_state';
+
+interface TimerState {
+  mode: Mode;
+  running: boolean;
+  startedAt?: number;   // Date.now() when timer started
+  totalSec?: number;    // total seconds of the current run
+  pausedLeft?: number;  // seconds left when paused
+  customMins: { focus: number; short: number; long: number };
+}
+
 const MODES: Record<Mode, { label: string; duration: number; color: string }> = {
   focus: { label: 'Фокус',             duration: 25 * 60, color: '#2563EB' },
   short: { label: 'Короткий перерыв',  duration:  5 * 60, color: '#0D9488' },
@@ -19,22 +30,52 @@ const TIPS = [
 
 const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
+function loadTimerState(): TimerState | null {
+  try {
+    const raw = localStorage.getItem(TIMER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function saveTimerState(s: TimerState) {
+  localStorage.setItem(TIMER_KEY, JSON.stringify(s));
+}
+
 export function TimerPage() {
-  const [mode,        setMode]        = useState<Mode>('focus');
-  const [timeLeft,    setTimeLeft]    = useState(MODES.focus.duration);
-  const [running,     setRunning]     = useState(false);
+  const saved = loadTimerState();
+
+  const [mode,        setMode]        = useState<Mode>(saved?.mode ?? 'focus');
+  const [customMins, setCustomMins]   = useState(saved?.customMins ?? { focus: 25, short: 5, long: 15 });
+
+  // Compute initial timeLeft from saved state
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    if (!saved) return MODES.focus.duration;
+    if (saved.running && saved.startedAt && saved.totalSec) {
+      const elapsed = Math.floor((Date.now() - saved.startedAt) / 1000);
+      const left = saved.totalSec - elapsed;
+      return left > 0 ? left : 0;
+    }
+    return saved.pausedLeft ?? (saved.customMins?.[saved.mode] ?? 25) * 60;
+  });
+  const [running, setRunning] = useState<boolean>(() => {
+    if (!saved?.running || !saved.startedAt || !saved.totalSec) return false;
+    const elapsed = Math.floor((Date.now() - saved.startedAt) / 1000);
+    return saved.totalSec - elapsed > 0;
+  });
+
   const [cycles,      setCycles]      = useState(0);
-  const [sessionSec,  setSessionSec]  = useState(0);   // seconds in current session
-  const [todaySec,    setTodaySec]    = useState(0);   // total seconds today
-  const [weekData,    setWeekData]    = useState<number[]>(Array(7).fill(0)); // hours per day
+  const [sessionSec,  setSessionSec]  = useState(0);
+  const [todaySec,    setTodaySec]    = useState(0);
+  const [weekData,    setWeekData]    = useState<number[]>(Array(7).fill(0));
   const [tasks,       setTasks]       = useState<Task[]>([]);
   const [currentTask, setCurrentTask] = useState<Task | null>(null);
   const [showAll,     setShowAll]     = useState(false);
   const [tipIdx]                      = useState(() => Math.floor(Math.random() * TIPS.length));
   const [showSettings, setShowSettings] = useState(false);
-  const [customMins, setCustomMins]   = useState({ focus: 25, short: 5, long: 15 });
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track startedAt + totalSec in refs for use inside interval
+  const startedAtRef = useRef<number | undefined>(saved?.running ? saved.startedAt : undefined);
+  const totalSecRef  = useRef<number | undefined>(saved?.running ? saved.totalSec  : undefined);
 
   // Load tasks
   useEffect(() => {
@@ -42,43 +83,75 @@ export function TimerPage() {
       .then(({ data }) => { if (data) setTasks(data as Task[]); });
   }, []);
 
-  // Timer tick
+  // Timer tick — compute from real timestamp so background tabs stay accurate
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => {
-        setTimeLeft(t => {
-          if (t <= 1) {
-            setRunning(false);
-            if (mode === 'focus') {
-              setCycles(c => c + 1);
-              setTodaySec(s => s + MODES.focus.duration);
-              const today = new Date().getDay();
-              const idx = today === 0 ? 6 : today - 1;
-              setWeekData(w => { const n = [...w]; n[idx] += MODES.focus.duration / 3600; return n; });
-            }
-            return 0;
+        if (!startedAtRef.current || !totalSecRef.current) return;
+        const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
+        const left = totalSecRef.current - elapsed;
+        if (left <= 0) {
+          clearInterval(intervalRef.current!);
+          setRunning(false);
+          setTimeLeft(0);
+          startedAtRef.current = undefined;
+          totalSecRef.current  = undefined;
+          if (mode === 'focus') {
+            setCycles(c => c + 1);
+            setTodaySec(s => s + MODES.focus.duration);
+            const today = new Date().getDay();
+            const idx = today === 0 ? 6 : today - 1;
+            setWeekData(w => { const n = [...w]; n[idx] += MODES.focus.duration / 3600; return n; });
           }
+          saveTimerState({ mode, running: false, pausedLeft: 0, customMins });
+        } else {
+          setTimeLeft(left);
           if (mode === 'focus') setSessionSec(s => s + 1);
-          return t - 1;
-        });
-      }, 1000);
+        }
+      }, 500); // 500ms for smoother update
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running, mode]);
+  }, [running, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function startTimer() {
+    const total = customMins[mode] * 60;
+    // If resuming from pause use current timeLeft, else full duration
+    const remaining = timeLeft > 0 ? timeLeft : total;
+    const now = Date.now();
+    startedAtRef.current = now - (total - remaining) * 1000;
+    totalSecRef.current  = total;
+    saveTimerState({ mode, running: true, startedAt: startedAtRef.current, totalSec: total, customMins });
+    setRunning(true);
+  }
+
+  function pauseTimer() {
+    setRunning(false);
+    startedAtRef.current = undefined;
+    totalSecRef.current  = undefined;
+    saveTimerState({ mode, running: false, pausedLeft: timeLeft, customMins });
+  }
 
   function switchMode(m: Mode) {
     setMode(m);
     setRunning(false);
-    setTimeLeft(customMins[m] * 60);
+    const t = customMins[m] * 60;
+    setTimeLeft(t);
     setSessionSec(0);
+    startedAtRef.current = undefined;
+    totalSecRef.current  = undefined;
+    saveTimerState({ mode: m, running: false, pausedLeft: t, customMins });
   }
 
   function reset() {
     setRunning(false);
-    setTimeLeft(customMins[mode] * 60);
+    const t = customMins[mode] * 60;
+    setTimeLeft(t);
     setSessionSec(0);
+    startedAtRef.current = undefined;
+    totalSecRef.current  = undefined;
+    saveTimerState({ mode, running: false, pausedLeft: t, customMins });
   }
 
   function fmtTime(s: number) {
@@ -161,8 +234,13 @@ export function TimerPage() {
                 <input type="number" min={1} max={60} value={customMins[m]}
                   onChange={e => {
                     const val = Math.max(1, Math.min(60, +e.target.value));
-                    setCustomMins(v => ({ ...v, [m]: val }));
-                    if (mode === m) { setTimeLeft(val * 60); setRunning(false); }
+                    const next = { ...customMins, [m]: val };
+                    setCustomMins(next);
+                    if (mode === m) {
+                      setTimeLeft(val * 60);
+                      setRunning(false);
+                      saveTimerState({ mode, running: false, pausedLeft: val * 60, customMins: next });
+                    }
                   }} />
                 <span>мин</span>
               </label>
@@ -184,7 +262,7 @@ export function TimerPage() {
           </div>
           <div className="timer-controls">
             <button className="timer-play-btn" style={{ background: mcolor }}
-              onClick={() => setRunning(r => !r)}>
+              onClick={() => running ? pauseTimer() : startTimer()}>
               {running
                 ? <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                 : <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg>}

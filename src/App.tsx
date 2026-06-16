@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { applyTheme, type ThemeKey } from './lib/themes';
-import { Auth } from './components/Auth';
+import { LandingPage } from './components/LandingPage';
 import { Entries } from './components/Entries';
 import { Planner } from './components/Planner';
 import { TimerPage } from './components/TimerPage';
@@ -75,19 +75,7 @@ export default function App() {
   if (loading) return <div className="loading">Загрузка…</div>;
 
   if (!session) {
-    return (
-      <div className="auth-page">
-        <div className="auth-logo">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="13" r="8"/>
-            <path d="M7 3A2 2 0 0110 1"/><path d="M14 1A2 2 0 0117 3"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/>
-          </svg>
-          PLANIFY
-        </div>
-        <Auth />
-      </div>
-    );
+    return <LandingPage />;
   }
 
   const email = session.user.email || '';
@@ -161,7 +149,7 @@ export default function App() {
       </aside>
 
       <main className="main-content">
-        {activeNav === 'Планировщик' ? <Planner /> : activeNav === 'Таймер' ? <TimerPage /> : activeNav === 'Прогресс' ? <ProgressPage /> : activeNav === 'ИИ-помощник' ? <AIPage /> : activeNav === 'Флеш-карты' ? <FlashCards /> : activeNav === 'Заметки' ? <NotesPage /> : activeNav === 'Настройки' ? <SettingsPage displayName={displayName} email={email} onNameChange={setDisplayName} avatarColor={avatarColor} onAvatarColorChange={handleAvatarColor} avatarImg={avatarImg} onAvatarImgChange={handleAvatarImg} theme={theme} onThemeChange={handleThemeChange} /> : <Entries userEmail={displayName} />}
+        {activeNav === 'Планировщик' ? <Planner /> : activeNav === 'Таймер' ? <TimerPage /> : activeNav === 'Прогресс' ? <ProgressPage /> : activeNav === 'ИИ-помощник' ? <AIPage /> : activeNav === 'Флеш-карты' ? <FlashCards /> : activeNav === 'Заметки' ? <NotesPage /> : activeNav === 'Настройки' ? <SettingsPage displayName={displayName} email={email} onNameChange={setDisplayName} avatarColor={avatarColor} onAvatarColorChange={handleAvatarColor} avatarImg={avatarImg} onAvatarImgChange={handleAvatarImg} theme={theme} onThemeChange={handleThemeChange} /> : <Entries userEmail={displayName} onNavigate={setActiveNav} />}
       </main>
     </div>
   );
