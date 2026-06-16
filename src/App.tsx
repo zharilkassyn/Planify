@@ -88,25 +88,38 @@ export default function App() {
 
         {/* Logo row */}
         <div className={`sidebar-logo${sidebarOpen ? '' : ' sidebar-logo-collapsed'}`}>
+          <div className="sidebar-logo-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
+              <circle cx="12" cy="13" r="8"/>
+              <path d="M7 3A2 2 0 0110 1"/><path d="M14 1A2 2 0 0117 3"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="13" x2="15" y2="16"/>
+            </svg>
+          </div>
+          {sidebarOpen && <span className="sidebar-logo-text">Planify</span>}
           {sidebarOpen && (
-            <>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="13" r="8"/>
-                <path d="M7 3A2 2 0 0110 1"/><path d="M14 1A2 2 0 0117 3"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/>
-              </svg>
-              <span className="sidebar-logo-text">Planify</span>
-            </>
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarOpen(v => !v)}
+              title="Свернуть панель"
+            >
+              <span className="toggle-bar" />
+              <span className="toggle-bar" />
+              <span className="toggle-bar" />
+            </button>
           )}
-          <button
-            className="sidebar-toggle-btn"
-            onClick={() => setSidebarOpen(v => !v)}
-            title={sidebarOpen ? 'Свернуть панель' : 'Развернуть панель'}
-          >
-            <span className="toggle-bar" />
-            <span className="toggle-bar" />
-            <span className="toggle-bar" />
-          </button>
+          {!sidebarOpen && (
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarOpen(v => !v)}
+              title="Развернуть панель"
+              style={{ marginTop: 8 }}
+            >
+              <span className="toggle-bar" />
+              <span className="toggle-bar" />
+              <span className="toggle-bar" />
+            </button>
+          )}
         </div>
 
         {/* Nav */}

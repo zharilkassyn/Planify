@@ -14,19 +14,25 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => void }) {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [total,    setTotal]    = useState(25 * 60);
-  const [mode,     setMode]     = useState('focus');
-  const [running,  setRunning]  = useState(false);
-  const [hidden,   setHidden]   = useState(false);
+  const [timeLeft,   setTimeLeft]   = useState(0);
+  const [total,      setTotal]      = useState(25 * 60);
+  const [mode,       setMode]       = useState('focus');
+  const [running,    setRunning]    = useState(false);
+  const [hidden,     setHidden]     = useState(false);
+  const [startedAt,  setStartedAt]  = useState<number | null>(null);
+  const [pos,        setPos]        = useState({ x: window.innerWidth - 240, y: 18 });
+  const [wSize,      setWSize]      = useState(210);
 
-  // Drag state
-  const [pos, setPos] = useState({ x: window.innerWidth - 230, y: 18 });
-  const dragging = useRef(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
+  const dragging        = useRef(false);
+  const dragOffset      = useRef({ x: 0, y: 0 });
+  const resizing        = useRef(false);
+  const resizeStartX    = useRef(0);
+  const resizeStartW    = useRef(0);
+  // stores the startedAt value that was active when user pressed X
+  // widget only re-appears when a NEW startedAt is detected
+  const hiddenAtStartedAt = useRef<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Poll localStorage for timer state
   useEffect(() => {
     const tick = () => {
       try {
@@ -37,12 +43,18 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
         const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
         const left = s.totalSec - elapsed;
         if (left <= 0) { setRunning(false); return; }
+
         setRunning(true);
         setMode(s.mode ?? 'focus');
         setTotal(s.totalSec);
         setTimeLeft(left);
-        // Re-show if timer was restarted after being hidden
-        setHidden(false);
+        setStartedAt(s.startedAt);
+
+        // Re-show only when a brand-new timer session starts
+        if (hiddenAtStartedAt.current !== null && s.startedAt !== hiddenAtStartedAt.current) {
+          hiddenAtStartedAt.current = null;
+          setHidden(false);
+        }
       } catch { setRunning(false); }
     };
     tick();
@@ -50,16 +62,20 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
     return () => clearInterval(id);
   }, []);
 
-  // Drag handlers
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
+      if (resizing.current) {
+        const newW = Math.max(160, Math.min(420, resizeStartW.current + (e.clientX - resizeStartX.current)));
+        setWSize(newW);
+        return;
+      }
       if (!dragging.current) return;
       setPos({
-        x: Math.max(0, Math.min(window.innerWidth  - (ref.current?.offsetWidth  ?? 200), e.clientX - dragOffset.current.x)),
+        x: Math.max(0, Math.min(window.innerWidth  - (ref.current?.offsetWidth  ?? 210), e.clientX - dragOffset.current.x)),
         y: Math.max(0, Math.min(window.innerHeight - (ref.current?.offsetHeight ?? 80),  e.clientY - dragOffset.current.y)),
       });
     };
-    const onUp = () => { dragging.current = false; };
+    const onUp = () => { dragging.current = false; resizing.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup',   onUp);
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
@@ -72,9 +88,15 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
   const mins  = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const secs  = String(timeLeft % 60).padStart(2, '0');
   const pct   = total > 0 ? (total - timeLeft) / total : 0;
-  const R = 30, CX = 36;
-  const circ = 2 * Math.PI * R;
-  const arc  = circ * pct;
+
+  // Scale ring and font with widget width
+  const ringSize    = Math.round(Math.max(52, Math.min(110, wSize * 0.37)));
+  const R           = ringSize * 0.41;
+  const CX          = ringSize / 2;
+  const circ        = 2 * Math.PI * R;
+  const arc         = circ * pct;
+  const iconSize    = Math.round(ringSize * 0.28);
+  const timeFontSz  = Math.round(Math.max(18, Math.min(40, wSize * 0.135)));
 
   return (
     <div
@@ -94,34 +116,29 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
         boxShadow: `0 6px 28px ${color}30, 0 2px 10px rgba(0,0,0,0.10)`,
         userSelect: 'none',
         cursor: 'grab',
-        minWidth: 190,
+        width: wSize,
+        boxSizing: 'border-box',
+        minWidth: 160,
       }}
       onMouseDown={e => {
-        // Don't start drag if clicking close button
-        if ((e.target as HTMLElement).closest('.ft-close')) return;
+        if ((e.target as HTMLElement).closest('.ft-close,.ft-resize')) return;
         dragging.current = true;
-        dragOffset.current = {
-          x: e.clientX - pos.x,
-          y: e.clientY - pos.y,
-        };
+        dragOffset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
       }}
     >
-      {/* Mini ring */}
+      {/* Ring */}
       <div
-        style={{ position: 'relative', width: 72, height: 72, flexShrink: 0, cursor: 'pointer' }}
+        style={{ position: 'relative', width: ringSize, height: ringSize, flexShrink: 0, cursor: 'pointer' }}
         onClick={() => onNavigate('Таймер')}
       >
-        <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={CX} cy={CX} r={R} fill="none" stroke={color + '25'} strokeWidth="5.5"/>
-          <circle cx={CX} cy={CX} r={R} fill="none" stroke={color} strokeWidth="5.5"
+        <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={CX} cy={CX} r={R} fill="none" stroke={color + '25'} strokeWidth="5"/>
+          <circle cx={CX} cy={CX} r={R} fill="none" stroke={color} strokeWidth="5"
             strokeDasharray={`${arc} ${circ}`} strokeLinecap="round"
             style={{ transition: 'stroke-dasharray 0.5s' }}/>
         </svg>
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5">
             <circle cx="12" cy="13" r="8"/>
             <path d="M7 3A2 2 0 0110 1"/><path d="M14 1A2 2 0 0117 3"/>
             <line x1="12" y1="9" x2="12" y2="13"/>
@@ -130,34 +147,28 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
         </div>
       </div>
 
-      {/* Text */}
-      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => onNavigate('Таймер')}>
-        <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500, marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: '#1E293B', letterSpacing: '-1px', lineHeight: 1 }}>
+      {/* Time + label */}
+      <div style={{ flex: 1, cursor: 'pointer', minWidth: 0, overflow: 'hidden' }} onClick={() => onNavigate('Таймер')}>
+        <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500, marginBottom: 2, whiteSpace: 'nowrap' }}>{label}</div>
+        <div style={{ fontSize: timeFontSz, fontWeight: 800, color: '#1E293B', letterSpacing: '-1px', lineHeight: 1, whiteSpace: 'nowrap' }}>
           {mins}:{secs}
         </div>
       </div>
 
-      {/* Close button */}
+      {/* Close — hides widget permanently until a new timer session starts */}
       <button
         className="ft-close"
-        onClick={e => { e.stopPropagation(); setHidden(true); }}
+        onClick={e => {
+          e.stopPropagation();
+          hiddenAtStartedAt.current = startedAt;
+          setHidden(true);
+        }}
         style={{
-          position: 'absolute',
-          top: 6,
-          right: 8,
-          width: 22,
-          height: 22,
-          borderRadius: '50%',
-          border: 'none',
-          background: '#F1F5F9',
-          color: '#94A3B8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          padding: 0,
-          flexShrink: 0,
+          position: 'absolute', top: 6, right: 8,
+          width: 22, height: 22, borderRadius: '50%',
+          border: 'none', background: '#F1F5F9', color: '#94A3B8',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', padding: 0, flexShrink: 0,
           transition: 'background 0.15s, color 0.15s',
         }}
         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
@@ -168,6 +179,27 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
           <line x1="11" y1="1" x2="1" y2="11"/>
         </svg>
       </button>
+
+      {/* Resize grip — bottom-right corner */}
+      <div
+        className="ft-resize"
+        style={{
+          position: 'absolute', bottom: 5, right: 6,
+          width: 14, height: 14, cursor: 'se-resize', opacity: 0.35,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end',
+        }}
+        onMouseDown={e => {
+          e.stopPropagation();
+          resizing.current = true;
+          resizeStartX.current = e.clientX;
+          resizeStartW.current = wSize;
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#64748B" strokeWidth="1.5" strokeLinecap="round">
+          <line x1="9" y1="3" x2="3" y2="9"/>
+          <line x1="9" y1="6" x2="6" y2="9"/>
+        </svg>
+      </div>
     </div>
   );
 }
