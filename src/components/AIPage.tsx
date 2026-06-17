@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { buildPlanifySystemPrompt, type PlanifyAiMode } from '../lib/aiContext';
 
 type PlannerDraftEvent = {
   title: string;
@@ -116,16 +117,25 @@ async function getAiErrorMessage(error: unknown): Promise<string> {
   return error instanceof Error ? error.message : 'Неизвестная ошибка';
 }
 
-async function askAi(prompt: string): Promise<string> {
+function extractRequestedCount(text: string, fallback: number) {
+  const lower = text.toLowerCase();
+  const match = lower.match(/(\d{1,3})\s*(флеш|карточ|карт|событ|пункт|вопрос|слайд)/);
+  if (!match) return fallback;
+  return Math.min(200, Math.max(1, Number(match[1])));
+}
+
+function getChatContext(messages: Message[]) {
+  return messages
+    .slice(-8)
+    .map(message => `${message.role === 'user' ? 'Пользователь' : 'Gemini'}: ${message.content.slice(0, 500)}`)
+    .join('\n');
+}
+
+async function askAi(prompt: string, mode: PlanifyAiMode = 'assistant', appState?: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
     body: {
       prompt,
-      system: [
-        'Ты ИИ-помощник для учебного приложения Planify.',
-        'Отвечай на русском языке, понятно и дружелюбно.',
-        'Помогай школьнику с учебой: объяснения, планы, тесты, конспекты, флеш-карты.',
-        'Не пиши слишком длинно без необходимости.',
-      ].join('\n'),
+      system: buildPlanifySystemPrompt({ mode, appState }),
     },
   });
 
@@ -194,7 +204,7 @@ async function askAiForSchedule(prompt: string): Promise<AiScheduleResponse> {
     `Доступные цвета: ${EVENT_COLORS.join(', ')}.`,
     'Верни только JSON без markdown.',
     'Формат: {"reply":"короткое описание расписания","events":[{"title":"...","description":"...","hour":9,"end_hour":10,"event_date":"YYYY-MM-DD","color":"#2563EB"}]}',
-  ].join('\n'));
+  ].join('\n'), 'schedule', `Сегодня: ${today}`);
 
   return parseScheduleResponse(response);
 }
@@ -206,13 +216,17 @@ function isFlashcardDraft(value: unknown): value is FlashcardDraft {
 }
 
 async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> {
+  const requestedCount = extractRequestedCount(prompt, 12);
   const response = await askAi([
     `Запрос пользователя: ${prompt}`,
+    `Точное количество карточек: ${requestedCount}`,
     'Создай учебную колоду флеш-карт.',
+    'Если тема требует переводов, добавь перевод в answer. Если тема теоретическая, добавь краткое объяснение и пример в answer.',
+    `Важно: верни ровно ${requestedCount} карточек, не меньше и не больше. Это не демо.`,
     'Верни только JSON без markdown.',
     'Формат: {"deckName":"название","description":"краткое описание","cards":[{"question":"вопрос","answer":"ответ"}]}',
-    'Сделай 8-12 карточек. Вопросы и ответы должны быть короткими и полезными.',
-  ].join('\n'));
+    'Вопросы и ответы должны быть короткими, полезными и не повторяться.',
+  ].join('\n'), 'flashcards', `Запрошено карточек: ${requestedCount}`);
 
   const cleanText = stripCodeFence(response);
   const start = cleanText.indexOf('{');
@@ -220,8 +234,11 @@ async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> 
   if (start === -1 || end === -1 || end <= start) throw new Error('ИИ не вернул JSON для флеш-карт');
 
   const parsed = JSON.parse(cleanText.slice(start, end + 1)) as Partial<FlashcardAiResponse>;
-  const cards = Array.isArray(parsed.cards) ? parsed.cards.filter(isFlashcardDraft).slice(0, 12) : [];
+  const cards = Array.isArray(parsed.cards) ? parsed.cards.filter(isFlashcardDraft).slice(0, requestedCount) : [];
   if (!parsed.deckName || cards.length === 0) throw new Error('ИИ не смог создать флеш-карты');
+  if (cards.length !== requestedCount) {
+    throw new Error(`ИИ вернул ${cards.length} карточек вместо ${requestedCount}. Попробуй ещё раз или уменьши количество.`);
+  }
 
   return {
     deckName: parsed.deckName.slice(0, 80),
@@ -338,14 +355,28 @@ export function AIPage({ onNavigate }: AIPageProps) {
     let schedule: PlannerDraftEvent[] | undefined;
     let targetNav: AppSection | undefined;
     let scheduleAlreadyAdded = false;
+    const appContext = [
+      `Активный раздел: ИИ-помощник`,
+      `Текущий запрос: ${content}`,
+      messages.length ? `История диалога:\n${getChatContext(messages)}` : 'История диалога: новый чат',
+    ].join('\n');
+    const setStage = (stage: string) => {
+      updateAiMessage(chatId, aiMessageId, message => ({ ...message, content: stage }));
+    };
+
     try {
       const lower = content.toLowerCase();
       if (includesAny(lower, ['презентац'])) {
+        setStage('Анализирую запрос и открываю генератор презентаций...');
         const presentationTopic = extractTopic(content) || content;
         localStorage.setItem(PRESENTATION_DRAFT_KEY, presentationTopic);
         targetNav = 'Генерация презентаций';
-        aiContent = `Открыл вкладку генерации презентаций и перенёс тему: «${presentationTopic}». Там можно выбрать шаблон, количество слайдов и создать презентацию.`;
+        aiContent = [
+          `Открыл вкладку генерации презентаций и перенёс тему: «${presentationTopic}».`,
+          'Дальше Planify учтёт количество слайдов, выбранный шаблон, создаст структуру, разные layout и финальный preview для скачивания.',
+        ].join('\n');
       } else if (includesAny(lower, ['таймер', 'помодоро', 'фокус'])) {
+        setStage('Настраиваю фокус-таймер...');
         const now = Date.now();
         const totalSec = 25 * 60;
         localStorage.setItem(TIMER_KEY, JSON.stringify({
@@ -358,7 +389,13 @@ export function AIPage({ onNavigate }: AIPageProps) {
         targetNav = 'Таймер';
         aiContent = 'Запустил фокус-таймер на 25 минут и открыл вкладку “Таймер”.';
       } else if (includesAny(lower, ['флеш', 'карточк'])) {
+        const requestedCount = extractRequestedCount(content, 12);
+        setStage(`Создаю полноценную колоду: ${requestedCount} карточек...\nЭтап 1/3: анализ темы`);
+        window.setTimeout(() => {
+          setStage(`Создаю полноценную колоду: ${requestedCount} карточек...\nЭтап 2/3: формирую вопросы и ответы`);
+        }, 900);
         const deck = await askAiForFlashcards(content);
+        setStage(`Создаю полноценную колоду: ${deck.cards.length} карточек...\nЭтап 3/3: сохраняю в Planify`);
         const { data, error } = await supabase.from('flashcard_decks')
           .insert({ name: deck.deckName, description: deck.description, color: EVENT_COLORS[0] })
           .select()
@@ -376,11 +413,13 @@ export function AIPage({ onNavigate }: AIPageProps) {
         targetNav = 'Флеш-карты';
         aiContent = `Создал колоду “${deck.deckName}” (${deck.cards.length} карточек) и открыл вкладку “Флеш-карты”.`;
       } else if (includesAny(lower, ['заметк', 'конспект'])) {
+        setStage('Анализирую материал и создаю структурированный конспект...');
         const noteText = await askAi([
           `Запрос пользователя: ${content}`,
           'Создай аккуратную учебную заметку/конспект на русском.',
           'Используй короткие заголовки, списки и понятные формулировки.',
-        ].join('\n'));
+          'Это должен быть готовый конспект, не пример.',
+        ].join('\n'), 'notes', appContext);
         const title = extractTopic(content).slice(0, 70) || 'Заметка от ИИ';
         const { error } = await supabase.from('notes').insert({
           title,
@@ -392,7 +431,9 @@ export function AIPage({ onNavigate }: AIPageProps) {
         targetNav = 'Заметки';
         aiContent = `Создал заметку “${title}” и открыл вкладку “Заметки”.`;
       } else if (isScheduleRequest(content)) {
+        setStage('Составляю расписание и готовлю события для планировщика...');
         const result = await askAiForSchedule(content);
+        setStage(`Сохраняю ${result.events.length} событий в планировщик...`);
         const { error } = await supabase.from('planner_events').insert(
           result.events.map(event => ({
             title: event.title,
@@ -409,7 +450,8 @@ export function AIPage({ onNavigate }: AIPageProps) {
         scheduleAlreadyAdded = true;
         targetNav = 'Планировщик';
       } else {
-        aiContent = await askAi(content);
+        setStage('Думаю над запросом в контексте Planify...');
+        aiContent = await askAi(content, 'assistant', appContext);
       }
     } catch (error) {
       const message = await getAiErrorMessage(error);

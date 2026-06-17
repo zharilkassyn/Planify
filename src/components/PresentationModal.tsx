@@ -6,6 +6,7 @@ import { normalizeLayout, sanitizeList, type PresentationSlide, type SlideCompar
 import { PresentationPreview } from './PresentationPreview';
 import { renderSlideToImage } from './SlideRenderer';
 import { getPresentationTheme } from './TemplateEngine';
+import { buildPlanifySystemPrompt } from '../lib/aiContext';
 import { supabase } from '../lib/supabase';
 
 interface AiSlideDraft {
@@ -224,6 +225,18 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       : 'Дизайн не выбран, подбери нейтральный современный стиль.';
 
     const prompt = [
+      'Planify Presentation Generator input:',
+      JSON.stringify({
+        topic,
+        slidesCount: count,
+        selectedTemplate: selectedTemplate
+          ? {
+            templateName: selectedTemplate.templateName,
+            style: selectedTemplate.style,
+            colors: selectedTemplate.colors,
+          }
+          : null,
+      }),
       `Тема презентации: ${topic}`,
       `Количество слайдов: ${count}`,
       styleText,
@@ -238,7 +251,15 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
       body: {
         prompt,
-        system: 'Ты senior AI presentation designer. Создавай русскоязычные слайды с разными layout, визуальной иерархией, коротким текстом и точными visualPrompt. Возвращай только валидный JSON.',
+        system: buildPlanifySystemPrompt({
+          mode: 'presentation',
+          appState: [
+            `Тема: ${topic}`,
+            `Количество слайдов: ${count}`,
+            `Выбранный шаблон: ${selectedTemplate?.templateName ?? 'не выбран'}`,
+            selectedTemplate ? `Цвета шаблона: ${selectedTemplate.colors.join(', ')}` : '',
+          ].filter(Boolean).join('\n'),
+        }),
       },
     });
 
