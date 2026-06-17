@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 type Message = { id: string; role: 'user' | 'ai'; content: string; time: string };
 type Chat    = { id: string; title: string; time: string; messages: Message[] };
+type AiFunctionResponse = { text?: string; error?: string };
 
 const CAPABILITIES = [
   { icon: '📷', color: '#2563EB', title: 'Конспекты из фото',   desc: 'Загрузи фото конспекта или учебника, и я сделаю структурированный конспект.' },
@@ -14,27 +16,12 @@ const CAPABILITIES = [
 
 const QUICK = ['Сделать конспект', 'Создать флеш-карты', 'Объяснить тему', 'Создать тест'];
 
-const MOCK_RESPONSES: Record<string, string> = {
-  'сделать конспект':  'Конечно! Напиши тему, по которой нужен конспект, и я структурирую материал для тебя.',
-  'создать флеш-карты': 'Отлично! Укажи тему или вставь текст — я создам флеш-карты для эффективного запоминания.',
-  'объяснить тему':    'С удовольствием! Напиши тему, которую хочешь понять, и я объясню её простыми словами.',
-  'создать тест':      'Хорошо! Укажи тему — я составлю тест с вопросами для самопроверки.',
-};
-
 function getTime() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
 function uid() {
   return Math.random().toString(36).slice(2);
-}
-
-function getMockResponse(text: string): string {
-  const lower = text.toLowerCase();
-  for (const [key, resp] of Object.entries(MOCK_RESPONSES)) {
-    if (lower.includes(key)) return resp;
-  }
-  return `Понял! Я работаю над ответом на твой вопрос: «${text}».\n\nДля полноценной работы ИИ-помощника подключи API-ключ Claude в настройках проекта. Пока что я отвечаю в демо-режиме.`;
 }
 
 const STORAGE_KEY = 'planify_chats';
@@ -45,6 +32,26 @@ function loadChats(): Chat[] {
 
 function saveChats(chats: Chat[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+}
+
+async function askAi(prompt: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
+    body: {
+      prompt,
+      system: [
+        'Ты ИИ-помощник для учебного приложения Planify.',
+        'Отвечай на русском языке, понятно и дружелюбно.',
+        'Помогай школьнику с учебой: объяснения, планы, тесты, конспекты, флеш-карты.',
+        'Не пиши слишком длинно без необходимости.',
+      ].join('\n'),
+    },
+  });
+
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  if (!data?.text?.trim()) throw new Error('ИИ не вернул ответ');
+
+  return data.text.trim();
 }
 
 export function AIPage() {
@@ -98,12 +105,18 @@ export function AIPage() {
     setChats(updated);
     saveChats(updated);
 
-    // fake AI typing
     setTyping(true);
-    await new Promise(r => setTimeout(r, 900 + Math.random() * 600));
-    setTyping(false);
+    let aiContent = '';
+    try {
+      aiContent = await askAi(content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      aiContent = `Не получилось получить ответ от ИИ.\n\nПроверь, что GEMINI_API_KEY добавлен в Supabase Secrets и функция ai задеплоена.\n\nДетали: ${message}`;
+    } finally {
+      setTyping(false);
+    }
 
-    const aiMsg: Message = { id: uid(), role: 'ai', content: getMockResponse(content), time: getTime() };
+    const aiMsg: Message = { id: uid(), role: 'ai', content: aiContent, time: getTime() };
     const final = updated.map(c =>
       c.id === chatId ? { ...c, messages: [...c.messages, aiMsg] } : c
     );
