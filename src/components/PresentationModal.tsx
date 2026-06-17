@@ -1,10 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
+import pptxgen from 'pptxgenjs';
+import { jsPDF } from 'jspdf';
 import type { SelectedTemplate } from './TemplateGallery';
 import { supabase } from '../lib/supabase';
 
 interface Slide { id: number; title: string; desc: string; }
 interface AiSlideDraft { title: string; desc: string; }
 interface AiFunctionResponse { text?: string; error?: string; }
+type DownloadFormat = 'pdf' | 'pptx';
+type PresTheme = {
+  name: string;
+  bg: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  text: string;
+  muted: string;
+  dark: boolean;
+};
 
 interface Props {
   topic: string;
@@ -14,7 +27,7 @@ interface Props {
   onDone: (title: string, slidesCount: number) => void;
 }
 
-type Step = 'slides' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'complete';
+type Step = 'slides' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'preview';
 
 const SLIDE_TEMPLATES: Array<{ title: string; desc: string }> = [
   { title: 'Введение',               desc: 'Общее введение в тему и основные понятия' },
@@ -60,15 +73,21 @@ const BUILDING_STEPS = [
 ];
 
 const STEP_DURATIONS = { planning: 1100, building: 950 };
+const SLIDE_W = 1280;
+const SLIDE_H = 720;
 
 export function PresentationModal({ topic, selectedTemplate, startMode, onClose, onDone }: Props) {
-  const [step, setStep]               = useState<Step>(startMode === 'ai' ? 'aiPreparing' : 'slides');
+  void startMode;
+  const [step, setStep]               = useState<Step>('slides');
   const [slidesCount, setSlidesCount] = useState(10);
   const [slides, setSlides]           = useState<Slide[]>([]);
   const [loadIdx, setLoadIdx]         = useState(0);
   const [aiNotice, setAiNotice]       = useState('');
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState('');
 
   const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB';
+  const theme = getPresentationTheme(selectedTemplate);
 
   // Refs so effects always see latest values without re-running
   const slidesCountRef = useRef(slidesCount);
@@ -77,11 +96,11 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   onDoneRef.current = onDone;
 
   function createSlides(count: number): Slide[] {
-    return SLIDE_TEMPLATES.slice(0, count).map((t, idx) => ({
-      id: idx + 1,
-      title: t.title,
-      desc: t.desc,
-    }));
+    const base = [
+      { title: topic.slice(0, 80) || 'Тема презентации', desc: 'Краткое введение: почему эта тема важна и что зритель узнает из презентации.' },
+      ...SLIDE_TEMPLATES,
+    ];
+    return base.slice(0, count).map((t, idx) => ({ id: idx + 1, title: t.title, desc: t.desc }));
   }
 
   function getResponseContext(error: unknown): Response | null {
@@ -139,6 +158,8 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       `Тема презентации: ${topic}`,
       `Количество слайдов: ${count}`,
       styleText,
+      'Сделай логичный план презентации: от введения к примерам, выводам и финальному слайду.',
+      'Каждый слайд должен подходить к теме, а описание должно объяснять, что примерно будет на слайде.',
       'Верни только JSON-массив без markdown.',
       'Формат каждого элемента: {"title":"короткий заголовок","desc":"1 короткое описание слайда"}.',
     ].join('\n');
@@ -200,6 +221,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   useEffect(() => {
     if (step !== 'planning') return;
     setLoadIdx(0);
+    setAiNotice('');
     let i = 0;
     const id = setInterval(() => {
       i++;
@@ -207,11 +229,21 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
         setLoadIdx(i);
       } else {
         clearInterval(id);
-        const count = slidesCountRef.current;
-        setSlides(createSlides(count));
-        setTimeout(() => setStep('structure'), 400);
       }
     }, STEP_DURATIONS.planning);
+
+    createSlidesWithAi(slidesCountRef.current)
+      .catch(async error => {
+        const message = await getAiErrorMessage(error);
+        setAiNotice(`Gemini пока недоступен, поэтому подготовили базовый план. Причина: ${message}`);
+        return createSlides(slidesCountRef.current);
+      })
+      .then(generated => {
+        setSlides(generated);
+        setLoadIdx(PLANNING_STEPS.length - 1);
+        setTimeout(() => setStep('structure'), 500);
+      });
+
     return () => clearInterval(id);
   }, [step]);
 
@@ -227,7 +259,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       } else {
         clearInterval(id);
         setTimeout(() => {
-          setStep('complete');
+          setStep('preview');
           onDoneRef.current(topic, slidesCountRef.current);
         }, 500);
       }
@@ -237,6 +269,47 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
 
   function updateSlide(id: number, field: 'title' | 'desc', value: string) {
     setSlides(s => s.map(sl => sl.id === id ? { ...sl, [field]: value } : sl));
+  }
+
+  function safeFileName() {
+    const clean = topic.trim().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s+/g, '-').slice(0, 48);
+    return clean || 'presentation';
+  }
+
+  async function downloadPresentation(format: DownloadFormat) {
+    setDownloadOpen(false);
+    setDownloadStatus(format === 'pdf' ? 'Готовим PDF...' : 'Готовим PPTX...');
+    try {
+      if (format === 'pdf') {
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [SLIDE_W, SLIDE_H] });
+        slides.forEach((slide, index) => {
+          if (index > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'landscape');
+          pdf.addImage(renderSlideToImage(slide, index, slides.length, topic, theme), 'PNG', 0, 0, SLIDE_W, SLIDE_H);
+        });
+        pdf.save(`${safeFileName()}.pdf`);
+      } else {
+        const pptx = new pptxgen();
+        pptx.layout = 'LAYOUT_WIDE';
+        pptx.author = 'Planify';
+        slides.forEach((slide, index) => {
+          const pptSlide = pptx.addSlide();
+          pptSlide.background = { color: theme.dark ? '0F172A' : 'FFFFFF' };
+          pptSlide.addImage({
+            data: renderSlideToImage(slide, index, slides.length, topic, theme),
+            x: 0,
+            y: 0,
+            w: 13.333,
+            h: 7.5,
+          });
+        });
+        await pptx.writeFile({ fileName: `${safeFileName()}.pptx` });
+      }
+      setDownloadStatus('Файл скачан');
+      window.setTimeout(() => setDownloadStatus(''), 1800);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      setDownloadStatus(`Не получилось скачать файл: ${message}`);
+    }
   }
 
   // Slider: compute thumb position for the floating number
@@ -294,7 +367,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
 
   return (
     <div className="pres-overlay" onClick={onClose}>
-      <div className="pres-modal" onClick={e => e.stopPropagation()}>
+      <div className={`pres-modal${step === 'preview' ? ' pres-modal-preview' : ''}`} onClick={e => e.stopPropagation()}>
 
         {/* Close */}
         <button className="pres-close" onClick={onClose}>
@@ -516,43 +589,226 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
           </div>
         )}
 
-        {/* ── STEP 5: complete ── */}
-        {step === 'complete' && (
-          <div style={{ textAlign: 'center', padding: '12px 0 4px' }}>
-            <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
-            <p className="pres-modal-title" style={{ marginBottom: 8 }}>Презентация готова!</p>
-            <p style={{ fontSize: 13, color: 'var(--soft)', marginBottom: 28 }}>
-              «{topic}» — {slidesCount} слайдов создано и сохранено
-              {selectedTemplate ? ` в стиле ${selectedTemplate.templateName}` : ''}
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '11px 22px', borderRadius: 12,
-                  border: `2px solid ${primaryColor}`, background: 'transparent',
-                  color: primaryColor, fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                }}
-              >
-                Закрыть
-              </button>
-              <button style={{
-                padding: '11px 22px', borderRadius: 12, border: 'none',
-                background: primaryColor, color: '#fff', fontWeight: 700,
-                fontSize: 14, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                Скачать PPTX
-              </button>
+        {/* ── STEP 5: preview ── */}
+        {step === 'preview' && (
+          <div>
+            <div className="pres-preview-header">
+              <div>
+                <p className="pres-modal-title" style={{ textAlign: 'left', marginBottom: 4 }}>Предпросмотр презентации</p>
+                <p style={{ fontSize: 13, color: 'var(--soft)' }}>
+                  «{topic}» · {slides.length} слайдов{selectedTemplate ? ` · ${selectedTemplate.templateName}` : ''}
+                </p>
+              </div>
+              <div className="pres-download-wrap">
+                <button className="pres-download-main" onClick={() => setDownloadOpen(v => !v)}>
+                  Скачать
+                  <span aria-hidden="true">⌄</span>
+                </button>
+                {downloadOpen && (
+                  <div className="pres-download-menu">
+                    <button onClick={() => downloadPresentation('pdf')}>Скачать PDF</button>
+                    <button onClick={() => downloadPresentation('pptx')}>Скачать PPTX</button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {downloadStatus && <p className="pres-download-status">{downloadStatus}</p>}
+            <div className="pres-preview-grid">
+              {slides.map((slide, index) => (
+                <div key={slide.id} className="pres-preview-card">
+                  <SlidePreview
+                    slide={slide}
+                    index={index}
+                    total={slides.length}
+                    topic={topic}
+                    theme={theme}
+                  />
+                  <div className="pres-preview-caption">Слайд {index + 1}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function getPresentationTheme(template: SelectedTemplate | null): PresTheme {
+  const name = template?.templateName ?? 'Planify Blue';
+  const colors = template?.colors ?? ['#2563EB', '#7C3AED', '#DBEAFE'];
+  const darkNames = ['Neon Future', 'Business Pro'];
+  const minimalNames = ['Minimal White', 'Academic Clean'];
+  const dark = darkNames.includes(name);
+
+  if (minimalNames.includes(name)) {
+    return {
+      name,
+      bg: '#FFFFFF',
+      primary: colors[2] ?? '#2563EB',
+      secondary: '#F8FAFC',
+      accent: colors[1] ?? '#CBD5E1',
+      text: '#0F172A',
+      muted: '#64748B',
+      dark: false,
+    };
+  }
+
+  return {
+    name,
+    bg: colors[0] ?? '#2563EB',
+    primary: colors[0] ?? '#2563EB',
+    secondary: colors[1] ?? '#7C3AED',
+    accent: colors[2] ?? '#DBEAFE',
+    text: dark ? '#F8FAFC' : '#FFFFFF',
+    muted: dark ? '#CBD5E1' : 'rgba(255,255,255,0.78)',
+    dark,
+  };
+}
+
+function SlidePreview({
+  slide,
+  index,
+  total,
+  topic,
+  theme,
+}: {
+  slide: Slide;
+  index: number;
+  total: number;
+  topic: string;
+  theme: PresTheme;
+}) {
+  const isLight = !theme.dark && (theme.bg === '#FFFFFF' || theme.bg === '#F8FAFC');
+  return (
+    <div
+      className="pres-slide-preview"
+      style={{
+        background: isLight
+          ? `linear-gradient(135deg, ${theme.bg} 0%, ${theme.secondary} 100%)`
+          : `radial-gradient(circle at 82% 18%, ${theme.accent}66, transparent 30%), linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+        color: theme.text,
+      }}
+    >
+      <div className="pres-slide-preview-top">
+        <span>{topic}</span>
+        <span>{String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
+      </div>
+      <div className="pres-slide-preview-body">
+        <div>
+          <div className="pres-slide-preview-kicker" style={{ color: isLight ? theme.primary : theme.accent }}>
+            {theme.name}
+          </div>
+          <h3 style={{ color: isLight ? '#0F172A' : theme.text }}>{slide.title}</h3>
+          <p style={{ color: isLight ? '#475569' : theme.muted }}>{slide.desc}</p>
+        </div>
+        <div className="pres-slide-preview-art" style={{ borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.36)' }}>
+          <span style={{ background: theme.primary }} />
+          <span style={{ background: theme.secondary }} />
+          <span style={{ background: theme.accent }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  words.forEach(word => {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function renderSlideToImage(slide: Slide, index: number, total: number, topic: string, theme: PresTheme): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = SLIDE_W;
+  canvas.height = SLIDE_H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas недоступен');
+
+  const gradient = ctx.createLinearGradient(0, 0, SLIDE_W, SLIDE_H);
+  gradient.addColorStop(0, theme.bg);
+  gradient.addColorStop(0.58, theme.primary);
+  gradient.addColorStop(1, theme.secondary);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, SLIDE_W, SLIDE_H);
+
+  ctx.globalAlpha = 0.26;
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.arc(1080, 130, 180, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(180, 620, 220, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  const light = theme.bg === '#FFFFFF' || theme.bg === '#F8FAFC';
+  const titleColor = light ? '#0F172A' : theme.text;
+  const textColor = light ? '#475569' : theme.muted;
+
+  ctx.fillStyle = light ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.13)';
+  roundRect(ctx, 72, 68, SLIDE_W - 144, SLIDE_H - 136, 34);
+  ctx.fill();
+
+  ctx.fillStyle = light ? theme.primary : theme.accent;
+  ctx.font = '700 28px Inter, Arial, sans-serif';
+  ctx.fillText(theme.name.toUpperCase(), 120, 142);
+
+  ctx.fillStyle = light ? '#64748B' : 'rgba(255,255,255,0.72)';
+  ctx.font = '600 24px Inter, Arial, sans-serif';
+  ctx.fillText(`${index + 1}/${total}`, 1080, 142);
+
+  ctx.fillStyle = titleColor;
+  ctx.font = '900 68px Inter, Arial, sans-serif';
+  wrapCanvasText(ctx, slide.title, 770).slice(0, 3).forEach((line, lineIndex) => {
+    ctx.fillText(line, 120, 260 + lineIndex * 76);
+  });
+
+  ctx.fillStyle = textColor;
+  ctx.font = '500 34px Inter, Arial, sans-serif';
+  wrapCanvasText(ctx, slide.desc, 760).slice(0, 4).forEach((line, lineIndex) => {
+    ctx.fillText(line, 120, 500 + lineIndex * 44);
+  });
+
+  ctx.fillStyle = light ? theme.secondary : 'rgba(255,255,255,0.18)';
+  roundRect(ctx, 900, 250, 230, 230, 42);
+  ctx.fill();
+  ctx.fillStyle = theme.accent;
+  roundRect(ctx, 940, 290, 150, 58, 29);
+  ctx.fill();
+  ctx.fillStyle = theme.primary;
+  ctx.beginPath();
+  ctx.arc(1016, 414, 54, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = light ? '#64748B' : 'rgba(255,255,255,0.7)';
+  ctx.font = '600 22px Inter, Arial, sans-serif';
+  ctx.fillText(topic.slice(0, 70), 120, 642);
+
+  return canvas.toDataURL('image/png');
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
