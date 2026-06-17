@@ -326,12 +326,28 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     <div className="pres-overlay" onClick={onClose}>
       <div className={`pres-modal${step === 'preview' ? ' pres-modal-preview' : ''}`} onClick={e => e.stopPropagation()}>
 
-        {/* Close */}
-        <button className="pres-close" onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        {/* Top actions */}
+        <div className={`pres-top-actions${step === 'preview' ? ' preview' : ''}`}>
+          {step === 'preview' && (
+            <div className="pres-download-wrap">
+              <button className="pres-download-main" onClick={() => setDownloadOpen(v => !v)}>
+                Скачать
+                <span aria-hidden="true">⌄</span>
+              </button>
+              {downloadOpen && (
+                <div className="pres-download-menu">
+                  <button onClick={() => downloadPresentation('pdf')}>Скачать PDF</button>
+                  <button onClick={() => downloadPresentation('pptx')}>Скачать PPTX</button>
+                </div>
+              )}
+            </div>
+          )}
+          <button className="pres-close" onClick={onClose}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
 
         {/* ── STEP 1: generation settings ── */}
         {step === 'settings' && (
@@ -601,7 +617,6 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
             theme={theme}
             downloadOpen={downloadOpen}
             downloadStatus={downloadStatus}
-            onToggleDownload={() => setDownloadOpen(v => !v)}
             onDownload={downloadPresentation}
           />
         )}

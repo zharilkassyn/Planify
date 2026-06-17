@@ -12,7 +12,6 @@ interface PresentationPreviewProps {
   theme: PresentationTheme;
   downloadOpen: boolean;
   downloadStatus: string;
-  onToggleDownload: () => void;
   onDownload: (format: DownloadFormat) => void;
 }
 
@@ -22,7 +21,6 @@ export function PresentationPreview({
   theme,
   downloadOpen,
   downloadStatus,
-  onToggleDownload,
   onDownload,
 }: PresentationPreviewProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -43,11 +41,7 @@ export function PresentationPreview({
             «{topic}» · {slides.length} слайдов
           </p>
         </div>
-        <div className="pres-download-wrap">
-          <button className="pres-download-main" onClick={onToggleDownload}>
-            Скачать
-            <span aria-hidden="true">⌄</span>
-          </button>
+        <div className="pres-download-wrap pres-download-inline">
           {downloadOpen && (
             <div className="pres-download-menu">
               <button onClick={() => onDownload('pdf')}>Скачать PDF</button>
