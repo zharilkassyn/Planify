@@ -2,6 +2,17 @@ import type { SelectedTemplate } from './TemplateGallery';
 import type { PresentationSlide } from './LayoutSystem';
 import type { Audience } from './PresentationGenerator';
 
+interface AiImageResponse {
+  imageDataUrl?: string;
+  error?: string;
+}
+
+interface AiImageClient {
+  functions: {
+    invoke: <T>(name: string, options: { body: Record<string, unknown> }) => Promise<{ data: T | null; error: unknown }>;
+  };
+}
+
 export function buildImagePrompt(
   topic: string,
   slide: Pick<PresentationSlide, 'title' | 'visual' | 'layout' | 'visualPrompt'>,
@@ -40,4 +51,36 @@ export function applyImagePrompts(
     ...slide,
     visualPrompt: buildImagePrompt(topic, slide, selectedTemplate, audience),
   }));
+}
+
+export async function generateSlideImages(
+  supabase: AiImageClient,
+  slides: PresentationSlide[],
+  getAiErrorMessage: (error: unknown) => Promise<string>,
+) {
+  const result: PresentationSlide[] = [];
+
+  for (const slide of slides) {
+    if (!slide.useImage) {
+      result.push(slide);
+      continue;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke<AiImageResponse>('ai', {
+        body: {
+          mode: 'image',
+          prompt: slide.visualPrompt,
+          system: 'Create a high-quality presentation image. No text, no labels, no watermark.',
+        },
+      });
+      if (error) throw new Error(await getAiErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      result.push(data?.imageDataUrl ? { ...slide, imageDataUrl: data.imageDataUrl } : slide);
+    } catch {
+      result.push(slide);
+    }
+  }
+
+  return result;
 }

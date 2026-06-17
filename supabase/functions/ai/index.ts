@@ -7,9 +7,11 @@
 //   3) Задеплой функцию:     npm run ai:deploy
 //
 // Модель можно поменять. gemini-2.5-flash — актуальная быстрая Flash-модель.
+// Для картинок используется Gemini image generation (Nano Banana).
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const MODEL = 'gemini-2.5-flash';
+const IMAGE_MODEL = 'gemini-3.1-flash-image';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -23,11 +25,12 @@ Deno.serve(async (req) => {
     if (!GEMINI_API_KEY) {
       throw new Error('Нет GEMINI_API_KEY. Поставь секрет: npm run ai:secret -- GEMINI_API_KEY=...');
     }
-    const { prompt, system } = await req.json();
+    const { prompt, system, mode } = await req.json();
     if (!prompt) throw new Error('Нужно поле prompt');
+    const isImageMode = mode === 'image';
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${isImageMode ? IMAGE_MODEL : MODEL}:generateContent`,
       {
         method: 'POST',
         headers: {
@@ -37,10 +40,15 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           systemInstruction: system ? { parts: [{ text: system }] } : undefined,
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.45,
-            maxOutputTokens: 32768,
-          },
+          generationConfig: isImageMode
+            ? {
+              temperature: 0.72,
+              responseModalities: ['TEXT', 'IMAGE'],
+            }
+            : {
+              temperature: 0.45,
+              maxOutputTokens: 32768,
+            },
         }),
       },
     );
@@ -51,7 +59,24 @@ Deno.serve(async (req) => {
       throw new Error(message);
     }
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    if (isImageMode) {
+      const imagePart = parts.find((part: { inlineData?: { data?: string; mimeType?: string } }) => part.inlineData?.data);
+      const textPart = parts.find((part: { text?: string }) => part.text);
+      const base64 = imagePart?.inlineData?.data;
+      const mimeType = imagePart?.inlineData?.mimeType ?? 'image/png';
+      if (!base64) throw new Error('Gemini не вернул изображение');
+
+      return new Response(JSON.stringify({
+        text: textPart?.text ?? '',
+        imageDataUrl: `data:${mimeType};base64,${base64}`,
+        mimeType,
+      }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const text = parts.find((part: { text?: string }) => part.text)?.text ?? '';
     if (!text) {
       throw new Error('Gemini вернул пустой ответ');
     }

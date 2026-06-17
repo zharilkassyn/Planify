@@ -66,7 +66,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
               <h2>{slide.title}</h2>
               <p>{slide.subtitle}</p>
             </div>
-            <VisualBlock slide={slide} theme={theme} />
+            {slide.useImage && <VisualBlock slide={slide} theme={theme} />}
           </div>
           <div className="slide-card-grid">
             {slide.content.slice(0, 4).map((item, itemIndex) => (
@@ -87,7 +87,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
               <h2>{slide.title}</h2>
               <p>{slide.subtitle}</p>
             </div>
-            <VisualBlock slide={slide} theme={theme} />
+            {slide.useImage && <VisualBlock slide={slide} theme={theme} />}
           </div>
           <div className="slide-timeline-line">
             {slide.timeline.slice(0, 4).map(item => (
@@ -108,7 +108,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
               <h2>{slide.title}</h2>
               <p>{slide.subtitle}</p>
             </div>
-            <VisualBlock slide={slide} theme={theme} />
+            {slide.useImage && <VisualBlock slide={slide} theme={theme} />}
           </div>
           <div className="slide-stat-grid">
             {slide.stats.slice(0, 3).map((stat, statIndex) => (
@@ -130,7 +130,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
               <h2>{slide.title}</h2>
               <p>{slide.subtitle}</p>
             </div>
-            <VisualBlock slide={slide} theme={theme} />
+            {slide.useImage && <VisualBlock slide={slide} theme={theme} />}
           </div>
           <div className="slide-comparison-grid">
             <ComparisonColumn title={slide.comparison?.leftTitle ?? 'Подход 1'} items={slide.comparison?.left ?? slide.content.slice(0, 3)} />
@@ -141,7 +141,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'quote' && (
         <div className="slide-layout-quote">
-          <VisualBlock slide={slide} theme={theme} />
+          {slide.useImage && <VisualBlock slide={slide} theme={theme} />}
           <div>
             <div className="slide-quote-mark">“</div>
             <blockquote>{slide.quote ?? slide.subtitle}</blockquote>
@@ -177,7 +177,11 @@ function ComparisonColumn({ title, items }: { title: string; items: string[] }) 
 
 function VisualBlock({ slide, theme, large = false }: { slide: PresentationSlide; theme: PresentationTheme; large?: boolean }) {
   return (
-    <div className={`slide-visual-block${large ? ' large' : ''}`} aria-label={slide.visualPrompt}>
+    <div
+      className={`slide-visual-block${large ? ' large' : ''}${slide.imageDataUrl ? ' has-image' : ''}`}
+      aria-label={slide.visualPrompt}
+      style={slide.imageDataUrl ? { backgroundImage: `url(${slide.imageDataUrl})` } : undefined}
+    >
       <div className="slide-photo-haze" />
       <div className="slide-photo-subject">
         <span style={{ background: theme.primary }} />
@@ -188,13 +192,13 @@ function VisualBlock({ slide, theme, large = false }: { slide: PresentationSlide
   );
 }
 
-export function renderSlideToImage(
+export async function renderSlideToImage(
   slide: PresentationSlide,
   index: number,
   total: number,
   topic: string,
   theme: PresentationTheme,
-): string {
+): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = SLIDE_W;
   canvas.height = SLIDE_H;
@@ -204,27 +208,29 @@ export function renderSlideToImage(
   paintBackground(ctx, theme);
   paintChrome(ctx, theme, index, total, topic);
 
+  const visualImage = slide.imageDataUrl ? await loadCanvasImage(slide.imageDataUrl) : null;
+
   switch (slide.layout) {
     case 'title':
-      paintTitle(ctx, slide, topic, theme);
+      paintTitle(ctx, slide, topic, theme, visualImage);
       break;
     case 'text-image':
-      paintTextImage(ctx, slide, theme);
+      paintTextImage(ctx, slide, theme, visualImage);
       break;
     case 'cards':
-      paintCards(ctx, slide, theme);
+      paintCards(ctx, slide, theme, visualImage);
       break;
     case 'timeline':
-      paintTimeline(ctx, slide, theme);
+      paintTimeline(ctx, slide, theme, visualImage);
       break;
     case 'statistics':
-      paintStatistics(ctx, slide, theme);
+      paintStatistics(ctx, slide, theme, visualImage);
       break;
     case 'comparison':
-      paintComparison(ctx, slide, theme);
+      paintComparison(ctx, slide, theme, visualImage);
       break;
     case 'quote':
-      paintQuote(ctx, slide, theme);
+      paintQuote(ctx, slide, theme, visualImage);
       break;
     case 'summary':
       paintSummary(ctx, slide, theme);
@@ -271,26 +277,26 @@ function paintChrome(ctx: CanvasRenderingContext2D, theme: PresentationTheme, in
   ctx.textAlign = 'left';
 }
 
-function paintTitle(ctx: CanvasRenderingContext2D, slide: PresentationSlide, topic: string, theme: PresentationTheme) {
+function paintTitle(ctx: CanvasRenderingContext2D, slide: PresentationSlide, topic: string, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintPanel(ctx, 70, 104, 1140, 540, theme);
   paintKicker(ctx, topic, 120, 180, theme);
   paintHeading(ctx, slide.title, 120, 270, 650, 72, theme);
   paintBody(ctx, slide.subtitle, 120, 485, 620, 34, theme, 2);
-  paintVisual(ctx, 830, 210, 260, theme);
+  paintVisual(ctx, 830, 210, 260, theme, image);
 }
 
-function paintTextImage(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintTextImage(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintKicker(ctx, 'Ключевые идеи', 84, 145, theme);
   paintHeading(ctx, slide.title, 84, 220, 640, 58, theme);
   paintBody(ctx, slide.subtitle, 84, 342, 610, 28, theme, 2);
   paintBullets(ctx, slide.content, 100, 440, 600, theme);
-  paintVisual(ctx, 825, 210, 260, theme);
+  paintVisual(ctx, 825, 210, 260, theme, image);
 }
 
-function paintCards(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintCards(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintHeading(ctx, slide.title, 84, 156, 880, 54, theme);
   paintBody(ctx, slide.subtitle, 84, 246, 780, 26, theme, 2);
-  paintVisual(ctx, 955, 132, 150, theme);
+  if (slide.useImage) paintVisual(ctx, 955, 132, 150, theme, image);
   slide.content.slice(0, 4).forEach((item, idx) => {
     const x = 84 + (idx % 2) * 560;
     const y = 350 + Math.floor(idx / 2) * 138;
@@ -300,10 +306,10 @@ function paintCards(ctx: CanvasRenderingContext2D, slide: PresentationSlide, the
   });
 }
 
-function paintTimeline(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintTimeline(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintHeading(ctx, slide.title, 84, 158, 900, 54, theme);
   paintBody(ctx, slide.subtitle, 84, 246, 760, 26, theme, 2);
-  paintVisual(ctx, 955, 128, 150, theme);
+  if (slide.useImage) paintVisual(ctx, 955, 128, 150, theme, image);
   ctx.strokeStyle = theme.dark ? 'rgba(255,255,255,0.34)' : theme.line;
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -321,10 +327,10 @@ function paintTimeline(ctx: CanvasRenderingContext2D, slide: PresentationSlide, 
   });
 }
 
-function paintStatistics(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintStatistics(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintHeading(ctx, slide.title, 84, 150, 850, 52, theme);
   paintBody(ctx, slide.subtitle, 84, 236, 760, 26, theme, 2);
-  paintVisual(ctx, 955, 124, 150, theme);
+  if (slide.useImage) paintVisual(ctx, 955, 124, 150, theme, image);
   slide.stats.slice(0, 3).forEach((stat, idx) => {
     const x = 84 + idx * 380;
     paintPanel(ctx, x, 345, 320, 210, theme);
@@ -338,24 +344,24 @@ function paintStatistics(ctx: CanvasRenderingContext2D, slide: PresentationSlide
   });
 }
 
-function paintComparison(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintComparison(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintHeading(ctx, slide.title, 84, 145, 900, 52, theme);
   paintBody(ctx, slide.subtitle, 84, 230, 760, 26, theme, 2);
-  paintVisual(ctx, 965, 124, 140, theme);
+  if (slide.useImage) paintVisual(ctx, 965, 124, 140, theme, image);
   const left = slide.comparison?.left ?? slide.content.slice(0, 3);
   const right = slide.comparison?.right ?? slide.content.slice(1, 4);
   paintCompareColumn(ctx, slide.comparison?.leftTitle ?? 'Подход 1', left, 110, 330, theme);
   paintCompareColumn(ctx, slide.comparison?.rightTitle ?? 'Подход 2', right, 680, 330, theme);
 }
 
-function paintQuote(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintQuote(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintPanel(ctx, 90, 118, 1100, 490, theme);
   ctx.fillStyle = theme.dark ? theme.accent : theme.primary;
   ctx.font = '900 110px Inter, Arial, sans-serif';
   ctx.fillText('“', 135, 238);
   paintHeading(ctx, slide.quote ?? slide.subtitle, 210, 300, 780, 54, theme);
   paintBody(ctx, slide.attribution ?? slide.visual, 214, 500, 620, 28, theme, 1);
-  paintVisual(ctx, 940, 250, 150, theme);
+  if (slide.useImage) paintVisual(ctx, 940, 250, 150, theme, image);
 }
 
 function paintSummary(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
@@ -415,8 +421,20 @@ function paintBullets(ctx: CanvasRenderingContext2D, items: string[], x: number,
   });
 }
 
-function paintVisual(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, theme: PresentationTheme) {
+function paintVisual(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, theme: PresentationTheme, image: HTMLImageElement | null) {
   paintPanel(ctx, x, y, size, size, theme);
+  if (image) {
+    ctx.save();
+    roundRect(ctx, x + 14, y + 14, size - 28, size - 28, 28);
+    ctx.clip();
+    const scale = Math.max((size - 28) / image.width, (size - 28) / image.height);
+    const drawW = image.width * scale;
+    const drawH = image.height * scale;
+    ctx.drawImage(image, x + 14 + (size - 28 - drawW) / 2, y + 14 + (size - 28 - drawH) / 2, drawW, drawH);
+    ctx.restore();
+    return;
+  }
+
   const photoGradient = ctx.createLinearGradient(x, y, x + size, y + size);
   photoGradient.addColorStop(0, theme.primary);
   photoGradient.addColorStop(0.52, theme.secondary);
@@ -439,6 +457,15 @@ function paintVisual(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
   ctx.lineTo(x + size * 0.88, y + size * 0.78);
   ctx.closePath();
   ctx.fill();
+}
+
+function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
 }
 
 function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

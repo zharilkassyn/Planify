@@ -18,6 +18,7 @@ export interface AiSlideDraft {
   layout?: string;
   visual?: string;
   visualPrompt?: string;
+  useImage?: unknown;
   stats?: unknown;
   comparison?: unknown;
   timeline?: unknown;
@@ -111,6 +112,7 @@ function normalizeSlideDraft(
   const visualPrompt = typeof rawVisualPrompt === 'string' && rawVisualPrompt.trim()
     ? rawVisualPrompt.trim()
     : `${visual}, topic ${topic}, ${selectedTemplate?.templateName ?? 'modern presentation'} style`;
+  const rawUseImage = 'useImage' in slide ? slide.useImage : undefined;
   const rawQuote = 'quote' in slide ? slide.quote : undefined;
   const rawAttribution = 'attribution' in slide ? slide.attribution : undefined;
 
@@ -123,6 +125,7 @@ function normalizeSlideDraft(
     layout,
     visual,
     visualPrompt,
+    useImage: idx === 0 || (typeof rawUseImage === 'boolean' ? rawUseImage : layout === 'text-image' || layout === 'quote'),
     stats: normalizeStats(slide, content),
     comparison: normalizeComparison(slide, content),
     timeline: normalizeTimeline(slide, content),

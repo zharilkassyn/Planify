@@ -40,6 +40,7 @@ const PLANNING_STEPS = [
   'Анализируем тему...',
   'Создаём план...',
   'Пишем image prompts...',
+  'Генерируем изображения...',
   'Распределяем layouts...',
 ];
 
@@ -52,7 +53,7 @@ const AI_PREP_STEPS = [
 
 const BUILDING_STEPS = [
   'Применяем TemplateEngine...',
-  'Собираем визуальные блоки...',
+  'Добавляем изображения...',
   'Строим разные layouts...',
   'Готово! ✓',
 ];
@@ -238,26 +239,26 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     try {
       if (format === 'pdf') {
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [SLIDE_W, SLIDE_H] });
-        slides.forEach((slide, index) => {
+        for (const [index, slide] of slides.entries()) {
           if (index > 0) pdf.addPage([SLIDE_W, SLIDE_H], 'landscape');
-          pdf.addImage(renderSlideToImage(slide, index, slides.length, topic, theme), 'PNG', 0, 0, SLIDE_W, SLIDE_H);
-        });
+          pdf.addImage(await renderSlideToImage(slide, index, slides.length, topic, theme), 'PNG', 0, 0, SLIDE_W, SLIDE_H);
+        }
         pdf.save(`${safeFileName()}.pdf`);
       } else {
         const pptx = new pptxgen();
         pptx.layout = 'LAYOUT_WIDE';
         pptx.author = 'Planify';
-        slides.forEach((slide, index) => {
+        for (const [index, slide] of slides.entries()) {
           const pptSlide = pptx.addSlide();
           pptSlide.background = { color: theme.dark ? '0F172A' : 'FFFFFF' };
           pptSlide.addImage({
-            data: renderSlideToImage(slide, index, slides.length, topic, theme),
+            data: await renderSlideToImage(slide, index, slides.length, topic, theme),
             x: 0,
             y: 0,
             w: 13.333,
             h: 7.5,
           });
-        });
+        }
         await pptx.writeFile({ fileName: `${safeFileName()}.pptx` });
       }
       setDownloadStatus('Файл скачан');

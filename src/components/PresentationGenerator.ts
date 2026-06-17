@@ -1,6 +1,7 @@
 import type { SelectedTemplate } from './TemplateGallery';
 import type { PresentationSlide } from './LayoutSystem';
 import { parsePresentationSlides } from './SlideBuilder';
+import { generateSlideImages } from './ImageGenerator';
 import { buildPlanifySystemPrompt } from '../lib/aiContext';
 
 export type InformationLevel = 'brief' | 'standard' | 'detailed';
@@ -71,9 +72,10 @@ export async function generatePresentationStructure({
     `Аудитория: ${AUDIENCE_LABELS[audience]}.`,
     `Шаблон для внутреннего дизайна: ${templateText}.`,
     '',
-    'Для каждого слайда верни: title, subtitle, content, visualPrompt, layout, visual.',
+    'Для каждого слайда верни: title, subtitle, content, visualPrompt, layout, visual, useImage.',
     'Разные layouts обязательны: title, text-image, timeline, comparison, statistics, cards, quote, summary.',
-    'Первый слайд должен быть title. Последний слайд должен быть summary.',
+    'Первый слайд должен быть title и useImage=true. Последний слайд должен быть summary.',
+    'Для остальных слайдов сам реши useImage=true или false: если изображение реально усилит смысл слайда, true; если лучше графики/карточки/таймлайн без фото, false.',
     'Не делай одинаковые страницы. Не делай один большой текст. Не вставляй тему как единственный заголовок.',
     'Не упоминай в title, subtitle, content, quote, attribution название шаблона, стиль шаблона, цвета или технические слова.',
     'Текст слайда должен содержать только тему и полезную информацию для пользователя.',
@@ -82,7 +84,7 @@ export async function generatePresentationStructure({
     'Не используй случайные картинки и абстрактные слова без связи со слайдом.',
     '',
     'Верни только валидный JSON без markdown:',
-    '{"slides":[{"number":1,"title":"...","subtitle":"...","content":["..."],"layout":"title|text-image|timeline|comparison|statistics|cards|quote|summary","visual":"описание визуального блока","visualPrompt":"image prompt","stats":[{"value":"...","label":"..."}],"comparison":{"leftTitle":"...","left":["..."],"rightTitle":"...","right":["..."]},"timeline":[{"label":"...","text":"..."}],"quote":"...","attribution":"..."}]}',
+    '{"slides":[{"number":1,"title":"...","subtitle":"...","content":["..."],"layout":"title|text-image|timeline|comparison|statistics|cards|quote|summary","visual":"описание визуального блока","visualPrompt":"image prompt","useImage":true,"stats":[{"value":"...","label":"..."}],"comparison":{"leftTitle":"...","left":["..."],"rightTitle":"...","right":["..."]},"timeline":[{"label":"...","text":"..."}],"quote":"...","attribution":"..."}]}',
   ].join('\n');
 
   const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
@@ -105,5 +107,6 @@ export async function generatePresentationStructure({
   if (data?.error) throw new Error(data.error);
   if (!data?.text) throw new Error('AI не вернул текст');
 
-  return parsePresentationSlides(data.text, slidesCount, topic, selectedTemplate, informationLevel, audience);
+  const slides = parsePresentationSlides(data.text, slidesCount, topic, selectedTemplate, informationLevel, audience);
+  return generateSlideImages(supabase, slides, getAiErrorMessage);
 }

@@ -34,6 +34,8 @@ export interface PresentationSlide {
   layout: SlideLayout;
   visual: string;
   visualPrompt: string;
+  useImage: boolean;
+  imageDataUrl?: string;
   stats: SlideStat[];
   comparison?: SlideComparison;
   timeline: SlideTimelineItem[];

@@ -4539,10 +4539,24 @@ button.ghost {
   background:
     radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--slide-accent) 62%, transparent), transparent 28%),
     linear-gradient(135deg, color-mix(in srgb, var(--slide-primary) 74%, #ffffff 6%), color-mix(in srgb, var(--slide-secondary) 74%, #111827 8%));
+  background-position: center;
+  background-size: cover;
 }
 
 .slide-visual-block.large {
   min-height: 340px;
+}
+
+.slide-visual-block.has-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 55%, rgba(15, 23, 42, 0.18));
+}
+
+.slide-visual-block.has-image .slide-photo-haze,
+.slide-visual-block.has-image .slide-photo-subject {
+  display: none;
 }
 
 .slide-photo-haze {
