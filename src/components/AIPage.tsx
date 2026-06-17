@@ -65,6 +65,10 @@ function saveChats(chats: Chat[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
 }
 
+function getTypingChunks(text: string): string[] {
+  return text.match(/.{1,4}(\s|$)|\S+/g) ?? [text];
+}
+
 function getResponseContext(error: unknown): Response | null {
   if (!error || typeof error !== 'object') return null;
   const maybeError = error as { context?: unknown };
@@ -185,11 +189,53 @@ export function AIPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
 
+  function commitChats(nextChats: Chat[]) {
+    setChats(nextChats);
+    saveChats(nextChats);
+  }
+
+  function updateAiMessage(
+    chatId: string,
+    messageId: string,
+    update: (message: Message) => Message,
+  ) {
+    setChats(prev => {
+      const next = prev.map(chat => {
+        if (chat.id !== chatId) return chat;
+        return {
+          ...chat,
+          messages: chat.messages.map(message => (
+            message.id === messageId ? update(message) : message
+          )),
+        };
+      });
+      saveChats(next);
+      return next;
+    });
+  }
+
+  async function typeAiMessage(
+    chatId: string,
+    messageId: string,
+    text: string,
+    schedule?: PlannerDraftEvent[],
+  ) {
+    const chunks = getTypingChunks(text);
+    let visibleText = '';
+
+    for (const chunk of chunks) {
+      visibleText += chunk;
+      updateAiMessage(chatId, messageId, message => ({ ...message, content: visibleText }));
+      await new Promise(resolve => window.setTimeout(resolve, 18));
+    }
+
+    updateAiMessage(chatId, messageId, message => ({ ...message, content: text, schedule }));
+  }
+
   function newChat() {
     const chat: Chat = { id: uid(), title: 'Новый чат', time: getTime(), messages: [] };
     const updated = [chat, ...chats];
-    setChats(updated);
-    saveChats(updated);
+    commitChats(updated);
     setActiveChat(chat.id);
     setShowHistory(false);
   }
@@ -207,18 +253,23 @@ export function AIPage() {
       const chat: Chat = { id: uid(), title: content.slice(0, 40), time: getTime(), messages: [] };
       currentChats = [chat, ...chats];
       chatId = chat.id;
-      setChats(currentChats);
+      commitChats(currentChats);
       setActiveChat(chatId);
     }
 
     const userMsg: Message = { id: uid(), role: 'user', content, time: getTime() };
+    const aiMessageId = uid();
+    const pendingAiMsg: Message = { id: aiMessageId, role: 'ai', content: '', time: getTime() };
     const updated = currentChats.map(c =>
       c.id === chatId
-        ? { ...c, title: c.messages.length === 0 ? content.slice(0, 40) : c.title, messages: [...c.messages, userMsg] }
+        ? {
+          ...c,
+          title: c.messages.length === 0 ? content.slice(0, 40) : c.title,
+          messages: [...c.messages, userMsg, pendingAiMsg],
+        }
         : c
     );
-    setChats(updated);
-    saveChats(updated);
+    commitChats(updated);
 
     setTyping(true);
     let aiContent = '';
@@ -238,12 +289,7 @@ export function AIPage() {
       setTyping(false);
     }
 
-    const aiMsg: Message = { id: uid(), role: 'ai', content: aiContent, time: getTime(), schedule };
-    const final = updated.map(c =>
-      c.id === chatId ? { ...c, messages: [...c.messages, aiMsg] } : c
-    );
-    setChats(final);
-    saveChats(final);
+    await typeAiMessage(chatId, aiMessageId, aiContent, schedule);
   }
 
   async function addScheduleToPlanner(messageId: string, schedule: PlannerDraftEvent[]) {
@@ -369,7 +415,11 @@ export function AIPage() {
                 <div className="msg-avatar">🤖</div>
               )}
               <div className={`msg-bubble ${m.role}`}>
-                <div className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                {m.role === 'ai' && !m.content ? (
+                  <div className="typing-dots"><span/><span/><span/></div>
+                ) : (
+                  <div className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                )}
                 {m.schedule && m.schedule.length > 0 && (
                   <div className="ai-schedule-card">
                     <div className="ai-schedule-head">
@@ -410,14 +460,6 @@ export function AIPage() {
             </div>
           ))}
 
-          {typing && (
-            <div className="msg-row ai">
-              <div className="msg-avatar">🤖</div>
-              <div className="msg-bubble ai">
-                <div className="typing-dots"><span/><span/><span/></div>
-              </div>
-            </div>
-          )}
           <div ref={bottomRef}/>
         </div>
 
