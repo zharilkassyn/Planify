@@ -5,7 +5,8 @@ export type SlideLayout =
   | 'timeline'
   | 'statistics'
   | 'comparison'
-  | 'conclusion';
+  | 'quote'
+  | 'summary';
 
 export interface SlideStat {
   value: string;
@@ -36,6 +37,8 @@ export interface PresentationSlide {
   stats: SlideStat[];
   comparison?: SlideComparison;
   timeline: SlideTimelineItem[];
+  quote?: string;
+  attribution?: string;
 }
 
 export const LAYOUT_SEQUENCE: SlideLayout[] = [
@@ -45,14 +48,15 @@ export const LAYOUT_SEQUENCE: SlideLayout[] = [
   'timeline',
   'statistics',
   'comparison',
+  'quote',
   'cards',
-  'conclusion',
+  'summary',
 ];
 
 export function normalizeLayout(value: string | undefined, index: number, total: number): SlideLayout {
   const clean = value?.toLowerCase().trim();
   if (index === 0) return 'title';
-  if (index === total - 1) return 'conclusion';
+  if (index === total - 1) return 'summary';
 
   if (clean === 'title slide' || clean === 'hero' || clean === 'title') return 'title';
   if (clean === 'text + image' || clean === 'text-image' || clean === 'image text') return 'text-image';
@@ -60,7 +64,8 @@ export function normalizeLayout(value: string | undefined, index: number, total:
   if (clean === 'timeline') return 'timeline';
   if (clean === 'statistics' || clean === 'stats') return 'statistics';
   if (clean === 'comparison' || clean === 'compare') return 'comparison';
-  if (clean === 'conclusion' || clean === 'summary') return 'conclusion';
+  if (clean === 'quote' || clean === 'citation') return 'quote';
+  if (clean === 'conclusion' || clean === 'summary') return 'summary';
 
   return LAYOUT_SEQUENCE[index % LAYOUT_SEQUENCE.length];
 }
@@ -79,8 +84,10 @@ export function getLayoutLabel(layout: SlideLayout): string {
       return 'Statistics';
     case 'comparison':
       return 'Comparison';
-    case 'conclusion':
-      return 'Conclusion';
+    case 'quote':
+      return 'Quote';
+    case 'summary':
+      return 'Summary';
   }
 }
 

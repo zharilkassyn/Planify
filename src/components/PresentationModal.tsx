@@ -2,25 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import pptxgen from 'pptxgenjs';
 import { jsPDF } from 'jspdf';
 import type { SelectedTemplate } from './TemplateGallery';
-import { normalizeLayout, sanitizeList, type PresentationSlide, type SlideComparison, type SlideStat, type SlideTimelineItem } from './LayoutSystem';
+import type { PresentationSlide } from './LayoutSystem';
+import { createFallbackSlides } from './SlideBuilder';
+import { generatePresentationStructure, type Audience, type InformationLevel } from './PresentationGenerator';
 import { PresentationPreview } from './PresentationPreview';
 import { renderSlideToImage } from './SlideRenderer';
 import { getPresentationTheme } from './TemplateEngine';
-import { buildPlanifySystemPrompt } from '../lib/aiContext';
 import { supabase } from '../lib/supabase';
-
-interface AiSlideDraft {
-  number?: number;
-  title?: string;
-  subtitle?: string;
-  content?: unknown;
-  layout?: string;
-  visual?: string;
-  visualPrompt?: string;
-  stats?: unknown;
-  comparison?: unknown;
-  timeline?: unknown;
-}
 
 interface AiFunctionResponse { text?: string; error?: string; }
 type DownloadFormat = 'pdf' | 'pptx';
@@ -33,23 +21,26 @@ interface Props {
   onDone: (title: string, slidesCount: number) => void;
 }
 
-type Step = 'slides' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'preview';
+type Step = 'settings' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'preview';
 
-const SLIDE_TEMPLATES: Array<{ title: string; subtitle: string; content: string[]; visual: string }> = [
-  { title: 'Введение', subtitle: 'Почему тема важна и что зритель узнает', content: ['Контекст темы', 'Главная идея', 'Цель презентации'], visual: 'Большая тематическая иллюстрация' },
-  { title: 'Ключевая идея', subtitle: 'Короткое объяснение сути простыми словами', content: ['Определение', 'Основные принципы', 'Где встречается'], visual: 'Иконки и смысловые блоки' },
-  { title: 'Основные направления', subtitle: 'Как тема делится на понятные части', content: ['Направление 1', 'Направление 2', 'Направление 3'], visual: 'Карточки с акцентами' },
-  { title: 'Этапы развития', subtitle: 'Как менялась тема со временем', content: ['Начало', 'Рост', 'Современный этап'], visual: 'Временная шкала' },
-  { title: 'Факты и данные', subtitle: 'Что показывают цифры и наблюдения', content: ['Рост интереса', 'Практическая польза', 'Влияние на людей'], visual: 'Графики и крупные числа' },
-  { title: 'Сравнение подходов', subtitle: 'Чем отличаются разные варианты', content: ['Сильные стороны', 'Ограничения', 'Когда применять'], visual: 'Две колонки сравнения' },
-  { title: 'Практические примеры', subtitle: 'Где это можно увидеть в жизни', content: ['Пример из учебы', 'Пример из работы', 'Пример из повседневности'], visual: 'Сценарии применения' },
-  { title: 'Главные выводы', subtitle: 'Что нужно запомнить после презентации', content: ['Главная мысль', 'Практическая польза', 'Следующий шаг'], visual: 'Финальный визуальный акцент' },
+const INFORMATION_LEVELS: Array<{ value: InformationLevel; title: string; desc: string }> = [
+  { value: 'brief', title: 'Краткая', desc: 'Главные мысли, мало текста, больше визуалов' },
+  { value: 'standard', title: 'Стандартная', desc: 'Баланс текста и изображений, подходит для учебы' },
+  { value: 'detailed', title: 'Подробная', desc: 'Больше объяснений, фактов и контента' },
+];
+
+const AUDIENCES: Array<{ value: Audience; title: string }> = [
+  { value: 'school', title: 'Школьники' },
+  { value: 'students', title: 'Студенты' },
+  { value: 'business', title: 'Бизнес' },
+  { value: 'professionals', title: 'Профессионалы' },
 ];
 
 const PLANNING_STEPS = [
   'Анализируем тему...',
   'Создаём план...',
-  'Распределяем информацию по слайдам...',
+  'Пишем image prompts...',
+  'Распределяем layouts...',
 ];
 
 const AI_PREP_STEPS = [
@@ -60,9 +51,9 @@ const AI_PREP_STEPS = [
 ];
 
 const BUILDING_STEPS = [
-  'Создаём дизайн...',
-  'Добавляем изображения...',
-  'Формируем слайды...',
+  'Применяем TemplateEngine...',
+  'Собираем визуальные блоки...',
+  'Строим разные layouts...',
   'Готово! ✓',
 ];
 
@@ -72,8 +63,10 @@ const SLIDE_H = 720;
 
 export function PresentationModal({ topic, selectedTemplate, startMode, onClose, onDone }: Props) {
   void startMode;
-  const [step, setStep]               = useState<Step>('slides');
+  const [step, setStep]               = useState<Step>('settings');
   const [slidesCount, setSlidesCount] = useState(10);
+  const [informationLevel, setInformationLevel] = useState<InformationLevel>('standard');
+  const [audience, setAudience] = useState<Audience>('school');
   const [slides, setSlides]           = useState<PresentationSlide[]>([]);
   const [loadIdx, setLoadIdx]         = useState(0);
   const [aiNotice, setAiNotice]       = useState('');
@@ -86,20 +79,15 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   // Refs so effects always see latest values without re-running
   const slidesCountRef = useRef(slidesCount);
   slidesCountRef.current = slidesCount;
+  const informationLevelRef = useRef(informationLevel);
+  informationLevelRef.current = informationLevel;
+  const audienceRef = useRef(audience);
+  audienceRef.current = audience;
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
   function createSlides(count: number): PresentationSlide[] {
-    const base = [
-      {
-        title: topic.slice(0, 80) || 'Тема презентации',
-        subtitle: 'Краткое введение: почему эта тема важна и что зритель узнает из презентации.',
-        content: ['Почему это важно', 'Что будет разобрано', 'Как применить знания'],
-        visual: 'Тематическая обложка',
-      },
-      ...SLIDE_TEMPLATES,
-    ];
-    return base.slice(0, count).map((slide, idx) => normalizeSlideDraft(slide, idx, count));
+    return createFallbackSlides(topic, count, selectedTemplate, informationLevelRef.current, audienceRef.current);
   }
 
   function getResponseContext(error: unknown): Response | null {
@@ -123,151 +111,18 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     return error instanceof Error ? error.message : 'Неизвестная ошибка';
   }
 
-  function parseAiSlides(text: string, count: number): PresentationSlide[] {
-    const cleanText = text.replace(/```json|```/g, '').trim();
-    const objectStart = cleanText.indexOf('{');
-    const objectEnd = cleanText.lastIndexOf('}');
-    const arrayStart = cleanText.indexOf('[');
-    const arrayEnd = cleanText.lastIndexOf(']');
-    if (objectStart === -1 && arrayStart === -1) throw new Error('AI ответил без JSON');
-
-    const jsonText = objectStart !== -1 && objectEnd > objectStart
-      ? cleanText.slice(objectStart, objectEnd + 1)
-      : cleanText.slice(arrayStart, arrayEnd + 1);
-
-    const parsed: unknown = JSON.parse(jsonText);
-    const rawSlides = Array.isArray(parsed)
-      ? parsed
-      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { slides?: unknown }).slides)
-        ? (parsed as { slides: unknown[] }).slides
-        : [];
-
-    const drafts = rawSlides.filter((value): value is AiSlideDraft => Boolean(value && typeof value === 'object')).slice(0, count);
-    if (drafts.length === 0) throw new Error('AI не вернул слайды');
-
-    return drafts.map((slide, idx) => normalizeSlideDraft(slide, idx, count));
-  }
-
-  function normalizeSlideDraft(slide: AiSlideDraft | { title: string; subtitle: string; content: string[]; visual: string }, idx: number, total: number): PresentationSlide {
-    const fallback = SLIDE_TEMPLATES[idx % SLIDE_TEMPLATES.length];
-    const content = sanitizeList('content' in slide ? slide.content : undefined, fallback.content);
-    const layout = normalizeLayout('layout' in slide ? slide.layout : undefined, idx, total);
-    const title = typeof slide.title === 'string' && slide.title.trim() ? slide.title.trim() : fallback.title;
-    const subtitle = typeof slide.subtitle === 'string' && slide.subtitle.trim() ? slide.subtitle.trim() : fallback.subtitle;
-    const visual = typeof slide.visual === 'string' && slide.visual.trim() ? slide.visual.trim() : fallback.visual;
-    const rawVisualPrompt = 'visualPrompt' in slide ? slide.visualPrompt : undefined;
-    const visualPrompt = typeof rawVisualPrompt === 'string' && rawVisualPrompt.trim()
-      ? rawVisualPrompt.trim()
-      : `${visual} for presentation about ${topic}, ${selectedTemplate?.templateName ?? 'modern clean style'}`;
-
-    return {
-      id: idx + 1,
-      number: idx + 1,
-      title: title.slice(0, 92),
-      subtitle: subtitle.slice(0, 150),
-      content,
-      layout,
-      visual,
-      visualPrompt,
-      stats: normalizeStats(slide, content),
-      comparison: normalizeComparison(slide, content),
-      timeline: normalizeTimeline(slide, content),
-    };
-  }
-
-  function normalizeStats(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideStat[] {
-    const source = 'stats' in slide && Array.isArray(slide.stats) ? slide.stats : [];
-    const stats = source
-      .filter((item): item is { value?: unknown; label?: unknown } => Boolean(item && typeof item === 'object'))
-      .map(item => ({
-        value: typeof item.value === 'string' ? item.value.slice(0, 12) : '3x',
-        label: typeof item.label === 'string' ? item.label.slice(0, 52) : 'важный показатель',
-      }))
-      .slice(0, 3);
-    return stats.length ? stats : content.slice(0, 3).map((item, idx) => ({ value: ['3', '7', '90%'][idx] ?? `${idx + 1}`, label: item }));
-  }
-
-  function normalizeTimeline(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideTimelineItem[] {
-    const source = 'timeline' in slide && Array.isArray(slide.timeline) ? slide.timeline : [];
-    const timeline = source
-      .filter((item): item is { label?: unknown; text?: unknown } => Boolean(item && typeof item === 'object'))
-      .map((item, idx) => ({
-        label: typeof item.label === 'string' ? item.label.slice(0, 18) : `Этап ${idx + 1}`,
-        text: typeof item.text === 'string' ? item.text.slice(0, 72) : content[idx] ?? 'Ключевой этап',
-      }))
-      .slice(0, 4);
-    return timeline.length ? timeline : content.slice(0, 4).map((item, idx) => ({ label: `Этап ${idx + 1}`, text: item }));
-  }
-
-  function normalizeComparison(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideComparison | undefined {
-    const comparison = 'comparison' in slide ? slide.comparison : undefined;
-    if (comparison && typeof comparison === 'object') {
-      const maybe = comparison as { leftTitle?: unknown; left?: unknown; rightTitle?: unknown; right?: unknown };
-      return {
-        leftTitle: typeof maybe.leftTitle === 'string' ? maybe.leftTitle.slice(0, 36) : 'Подход A',
-        left: sanitizeList(maybe.left, content.slice(0, 3)),
-        rightTitle: typeof maybe.rightTitle === 'string' ? maybe.rightTitle.slice(0, 36) : 'Подход B',
-        right: sanitizeList(maybe.right, content.slice(1, 4)),
-      };
-    }
-
-    return {
-      leftTitle: 'Плюсы',
-      left: content.slice(0, 3),
-      rightTitle: 'Важно учесть',
-      right: content.slice(1, 4).length ? content.slice(1, 4) : content,
-    };
-  }
-
   async function createSlidesWithAi(count: number): Promise<PresentationSlide[]> {
-    const styleText = selectedTemplate
-      ? `Выбранный дизайн: ${selectedTemplate.templateName}, стиль ${selectedTemplate.style}, цвета ${selectedTemplate.colors.join(', ')}.`
-      : 'Дизайн не выбран, подбери нейтральный современный стиль.';
-
-    const prompt = [
-      'Planify Presentation Generator input:',
-      JSON.stringify({
+    return generatePresentationStructure({
+      supabase,
+      getAiErrorMessage,
+      settings: {
         topic,
         slidesCount: count,
-        selectedTemplate: selectedTemplate
-          ? {
-            templateName: selectedTemplate.templateName,
-            style: selectedTemplate.style,
-            colors: selectedTemplate.colors,
-          }
-          : null,
-      }),
-      `Тема презентации: ${topic}`,
-      `Количество слайдов: ${count}`,
-      styleText,
-      'Создай профессиональную структуру презентации как Gamma/Canva AI, не просто текст.',
-      'Верни только JSON-объект без markdown в формате {"slides":[...]}.',
-      'Каждый слайд: {"number":1,"title":"...","subtitle":"...","content":["коротко","коротко","коротко"],"layout":"title|text-image|cards|timeline|statistics|comparison|conclusion","visual":"что видно на слайде","visualPrompt":"точный промпт для иллюстрации","stats":[{"value":"75%","label":"..."}],"comparison":{"leftTitle":"...","left":["..."],"rightTitle":"...","right":["..."]},"timeline":[{"label":"...","text":"..."}]}.',
-      'Используй разные layout: первый title, последний conclusion, между ними text-image, cards, timeline, statistics, comparison.',
-      'Текст должен быть короткий, читаемый, без длинных абзацев. Каждый visualPrompt должен описывать конкретную иллюстрацию, а не случайные слова.',
-      'Дизайн и визуальные подсказки должны соответствовать выбранному шаблону.',
-    ].join('\n');
-
-    const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
-      body: {
-        prompt,
-        system: buildPlanifySystemPrompt({
-          mode: 'presentation',
-          appState: [
-            `Тема: ${topic}`,
-            `Количество слайдов: ${count}`,
-            `Выбранный шаблон: ${selectedTemplate?.templateName ?? 'не выбран'}`,
-            selectedTemplate ? `Цвета шаблона: ${selectedTemplate.colors.join(', ')}` : '',
-          ].filter(Boolean).join('\n'),
-        }),
+        informationLevel: informationLevelRef.current,
+        audience: audienceRef.current,
+        selectedTemplate,
       },
     });
-
-    if (error) throw new Error(await getAiErrorMessage(error));
-    if (data?.error) throw new Error(data.error);
-    if (!data?.text) throw new Error('AI не вернул текст');
-
-    return parseAiSlides(data.text, count);
   }
 
   /* ── AI quick preparation ── */
@@ -359,7 +214,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     return () => clearInterval(id);
   }, [step, topic]);
 
-  function updateSlide(id: number, field: 'title' | 'subtitle' | 'content', value: string) {
+  function updateSlide(id: number, field: 'title' | 'subtitle' | 'content' | 'visualPrompt', value: string) {
     setSlides(s => s.map(sl => {
       if (sl.id !== id) return sl;
       if (field === 'content') {
@@ -477,10 +332,10 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
           </svg>
         </button>
 
-        {/* ── STEP 1: slide count ── */}
-        {step === 'slides' && (
+        {/* ── STEP 1: generation settings ── */}
+        {step === 'settings' && (
           <div>
-            <p className="pres-modal-title" style={{ marginBottom: 2 }}>Выберите количество слайдов</p>
+            <p className="pres-modal-title" style={{ marginBottom: 2 }}>Настройки генерации</p>
             <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--soft)', marginBottom: 36 }}>
               Тема: «{topic}»
             </p>
@@ -533,8 +388,41 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
             </div>
 
             <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--soft)', margin: '20px 0 28px' }}>
-              ИИ создаст презентацию из выбранного количества слайдов
+              ИИ создаст структуру, image prompts, дизайн и preview
             </p>
+
+            <div className="pres-settings-group">
+              <div className="pres-settings-label">Насколько подробной должна быть презентация?</div>
+              <div className="pres-choice-grid">
+                {INFORMATION_LEVELS.map(level => (
+                  <button
+                    key={level.value}
+                    type="button"
+                    className={informationLevel === level.value ? 'active' : ''}
+                    onClick={() => setInformationLevel(level.value)}
+                  >
+                    <strong>{level.title}</strong>
+                    <span>{level.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pres-settings-group">
+              <div className="pres-settings-label">Для кого презентация?</div>
+              <div className="pres-audience-grid">
+                {AUDIENCES.map(item => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className={audience === item.value ? 'active' : ''}
+                    onClick={() => setAudience(item.value)}
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <button
               onClick={() => setStep('planning')}
@@ -545,7 +433,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              Дальше
+              Создать структуру
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
               </svg>
@@ -600,11 +488,11 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                 padding: '4px 10px', borderRadius: 20, border: '1px solid var(--border)',
                 whiteSpace: 'nowrap',
               }}>
-                {slidesCount} слайдов
+                {slidesCount} слайдов · {informationLevel === 'brief' ? 'краткая' : informationLevel === 'detailed' ? 'подробная' : 'стандартная'}
               </span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--soft)', marginBottom: 18 }}>
-              Можно редактировать названия, подзаголовки и ключевые блоки перед созданием
+              Можно редактировать названия, блоки и image prompts перед созданием дизайна
             </p>
             {aiNotice && <p className="pres-ai-notice structure">{aiNotice}</p>}
 
@@ -641,6 +529,12 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                       onChange={e => updateSlide(sl.id, 'content', e.target.value)}
                       rows={2}
                       style={{ fontSize: 12, color: 'var(--soft)' }}
+                    />
+                    <input
+                      className="pres-slide-input pres-slide-visual-input"
+                      value={sl.visualPrompt}
+                      onChange={e => updateSlide(sl.id, 'visualPrompt', e.target.value)}
+                      style={{ fontSize: 11, color: 'var(--soft)' }}
                     />
                   </div>
                 </div>

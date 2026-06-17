@@ -127,8 +127,17 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
         </div>
       )}
 
-      {slide.layout === 'conclusion' && (
-        <div className="slide-layout-conclusion">
+      {slide.layout === 'quote' && (
+        <div className="slide-layout-quote">
+          <div className="slide-quote-mark">“</div>
+          <blockquote>{slide.quote ?? slide.subtitle}</blockquote>
+          <span>{slide.attribution ?? topic}</span>
+          <p>{slide.visual}</p>
+        </div>
+      )}
+
+      {slide.layout === 'summary' && (
+        <div className="slide-layout-summary">
           <div>
             <span className="slide-kicker">{slide.visual}</span>
             <h2>{slide.title}</h2>
@@ -201,8 +210,11 @@ export function renderSlideToImage(
     case 'comparison':
       paintComparison(ctx, slide, theme);
       break;
-    case 'conclusion':
-      paintConclusion(ctx, slide, theme);
+    case 'quote':
+      paintQuote(ctx, slide, theme);
+      break;
+    case 'summary':
+      paintSummary(ctx, slide, theme);
       break;
   }
 
@@ -319,7 +331,17 @@ function paintComparison(ctx: CanvasRenderingContext2D, slide: PresentationSlide
   paintCompareColumn(ctx, slide.comparison?.rightTitle ?? 'Подход 2', right, 680, 330, theme);
 }
 
-function paintConclusion(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+function paintQuote(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
+  paintPanel(ctx, 90, 118, 1100, 490, theme);
+  ctx.fillStyle = theme.dark ? theme.accent : theme.primary;
+  ctx.font = '900 110px Inter, Arial, sans-serif';
+  ctx.fillText('“', 135, 238);
+  paintHeading(ctx, slide.quote ?? slide.subtitle, 210, 300, 780, 54, theme);
+  paintBody(ctx, slide.attribution ?? slide.visual, 214, 500, 620, 28, theme, 1);
+  paintVisual(ctx, 940, 250, 150, theme, slide.visual);
+}
+
+function paintSummary(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintPanel(ctx, 78, 104, 1124, 540, theme);
   paintKicker(ctx, slide.visual, 126, 176, theme);
   paintHeading(ctx, slide.title, 126, 262, 760, 64, theme);
