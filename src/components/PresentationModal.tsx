@@ -2,22 +2,27 @@ import { useState, useEffect, useRef } from 'react';
 import pptxgen from 'pptxgenjs';
 import { jsPDF } from 'jspdf';
 import type { SelectedTemplate } from './TemplateGallery';
+import { normalizeLayout, sanitizeList, type PresentationSlide, type SlideComparison, type SlideStat, type SlideTimelineItem } from './LayoutSystem';
+import { PresentationPreview } from './PresentationPreview';
+import { renderSlideToImage } from './SlideRenderer';
+import { getPresentationTheme } from './TemplateEngine';
 import { supabase } from '../lib/supabase';
 
-interface Slide { id: number; title: string; desc: string; }
-interface AiSlideDraft { title: string; desc: string; }
+interface AiSlideDraft {
+  number?: number;
+  title?: string;
+  subtitle?: string;
+  content?: unknown;
+  layout?: string;
+  visual?: string;
+  visualPrompt?: string;
+  stats?: unknown;
+  comparison?: unknown;
+  timeline?: unknown;
+}
+
 interface AiFunctionResponse { text?: string; error?: string; }
 type DownloadFormat = 'pdf' | 'pptx';
-type PresTheme = {
-  name: string;
-  bg: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  text: string;
-  muted: string;
-  dark: boolean;
-};
 
 interface Props {
   topic: string;
@@ -29,27 +34,15 @@ interface Props {
 
 type Step = 'slides' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'preview';
 
-const SLIDE_TEMPLATES: Array<{ title: string; desc: string }> = [
-  { title: 'Введение',               desc: 'Общее введение в тему и основные понятия' },
-  { title: 'История и предпосылки', desc: 'Исторический контекст и предпосылки развития' },
-  { title: 'Основные понятия',       desc: 'Ключевые термины и определения по теме' },
-  { title: 'Факты и данные',         desc: 'Важные факты, статистика и исследования' },
-  { title: 'Примеры',                desc: 'Практические примеры и иллюстрации' },
-  { title: 'Современное состояние',  desc: 'Актуальное положение дел и тенденции' },
-  { title: 'Преимущества',           desc: 'Положительные аспекты и преимущества' },
-  { title: 'Проблемы и вызовы',      desc: 'Существующие проблемы и пути решения' },
-  { title: 'Перспективы развития',   desc: 'Будущие тенденции и перспективы' },
-  { title: 'Практическое применение',desc: 'Как применять знания на практике' },
-  { title: 'Международный опыт',     desc: 'Опыт других стран и организаций' },
-  { title: 'Влияние на общество',    desc: 'Социальное и культурное влияние' },
-  { title: 'Экономический аспект',   desc: 'Экономические факторы и последствия' },
-  { title: 'Технологии',             desc: 'Технологические решения и инновации' },
-  { title: 'Сравнительный анализ',   desc: 'Сравнение различных подходов' },
-  { title: 'Ключевые выводы',        desc: 'Главные выводы и итоги' },
-  { title: 'Рекомендации',           desc: 'Практические рекомендации и советы' },
-  { title: 'Заключение',             desc: 'Подведение итогов и финальные мысли' },
-  { title: 'Вопросы и ответы',       desc: 'Время для обсуждения' },
-  { title: 'Список источников',      desc: 'Использованная литература и ссылки' },
+const SLIDE_TEMPLATES: Array<{ title: string; subtitle: string; content: string[]; visual: string }> = [
+  { title: 'Введение', subtitle: 'Почему тема важна и что зритель узнает', content: ['Контекст темы', 'Главная идея', 'Цель презентации'], visual: 'Большая тематическая иллюстрация' },
+  { title: 'Ключевая идея', subtitle: 'Короткое объяснение сути простыми словами', content: ['Определение', 'Основные принципы', 'Где встречается'], visual: 'Иконки и смысловые блоки' },
+  { title: 'Основные направления', subtitle: 'Как тема делится на понятные части', content: ['Направление 1', 'Направление 2', 'Направление 3'], visual: 'Карточки с акцентами' },
+  { title: 'Этапы развития', subtitle: 'Как менялась тема со временем', content: ['Начало', 'Рост', 'Современный этап'], visual: 'Временная шкала' },
+  { title: 'Факты и данные', subtitle: 'Что показывают цифры и наблюдения', content: ['Рост интереса', 'Практическая польза', 'Влияние на людей'], visual: 'Графики и крупные числа' },
+  { title: 'Сравнение подходов', subtitle: 'Чем отличаются разные варианты', content: ['Сильные стороны', 'Ограничения', 'Когда применять'], visual: 'Две колонки сравнения' },
+  { title: 'Практические примеры', subtitle: 'Где это можно увидеть в жизни', content: ['Пример из учебы', 'Пример из работы', 'Пример из повседневности'], visual: 'Сценарии применения' },
+  { title: 'Главные выводы', subtitle: 'Что нужно запомнить после презентации', content: ['Главная мысль', 'Практическая польза', 'Следующий шаг'], visual: 'Финальный визуальный акцент' },
 ];
 
 const PLANNING_STEPS = [
@@ -80,7 +73,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   void startMode;
   const [step, setStep]               = useState<Step>('slides');
   const [slidesCount, setSlidesCount] = useState(10);
-  const [slides, setSlides]           = useState<Slide[]>([]);
+  const [slides, setSlides]           = useState<PresentationSlide[]>([]);
   const [loadIdx, setLoadIdx]         = useState(0);
   const [aiNotice, setAiNotice]       = useState('');
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -95,12 +88,17 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
-  function createSlides(count: number): Slide[] {
+  function createSlides(count: number): PresentationSlide[] {
     const base = [
-      { title: topic.slice(0, 80) || 'Тема презентации', desc: 'Краткое введение: почему эта тема важна и что зритель узнает из презентации.' },
+      {
+        title: topic.slice(0, 80) || 'Тема презентации',
+        subtitle: 'Краткое введение: почему эта тема важна и что зритель узнает из презентации.',
+        content: ['Почему это важно', 'Что будет разобрано', 'Как применить знания'],
+        visual: 'Тематическая обложка',
+      },
       ...SLIDE_TEMPLATES,
     ];
-    return base.slice(0, count).map((t, idx) => ({ id: idx + 1, title: t.title, desc: t.desc }));
+    return base.slice(0, count).map((slide, idx) => normalizeSlideDraft(slide, idx, count));
   }
 
   function getResponseContext(error: unknown): Response | null {
@@ -124,32 +122,103 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     return error instanceof Error ? error.message : 'Неизвестная ошибка';
   }
 
-  function isAiSlideDraft(value: unknown): value is AiSlideDraft {
-    if (!value || typeof value !== 'object') return false;
-    const maybeSlide = value as Partial<AiSlideDraft>;
-    return typeof maybeSlide.title === 'string' && typeof maybeSlide.desc === 'string';
-  }
-
-  function parseAiSlides(text: string, count: number): Slide[] {
+  function parseAiSlides(text: string, count: number): PresentationSlide[] {
     const cleanText = text.replace(/```json|```/g, '').trim();
-    const start = cleanText.indexOf('[');
-    const end = cleanText.lastIndexOf(']');
-    if (start === -1 || end === -1 || end <= start) throw new Error('AI ответил без JSON-массива');
+    const objectStart = cleanText.indexOf('{');
+    const objectEnd = cleanText.lastIndexOf('}');
+    const arrayStart = cleanText.indexOf('[');
+    const arrayEnd = cleanText.lastIndexOf(']');
+    if (objectStart === -1 && arrayStart === -1) throw new Error('AI ответил без JSON');
 
-    const parsed: unknown = JSON.parse(cleanText.slice(start, end + 1));
-    if (!Array.isArray(parsed)) throw new Error('AI ответил в неверном формате');
+    const jsonText = objectStart !== -1 && objectEnd > objectStart
+      ? cleanText.slice(objectStart, objectEnd + 1)
+      : cleanText.slice(arrayStart, arrayEnd + 1);
 
-    const drafts = parsed.filter(isAiSlideDraft).slice(0, count);
+    const parsed: unknown = JSON.parse(jsonText);
+    const rawSlides = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { slides?: unknown }).slides)
+        ? (parsed as { slides: unknown[] }).slides
+        : [];
+
+    const drafts = rawSlides.filter((value): value is AiSlideDraft => Boolean(value && typeof value === 'object')).slice(0, count);
     if (drafts.length === 0) throw new Error('AI не вернул слайды');
 
-    return drafts.map((slide, idx) => ({
-      id: idx + 1,
-      title: slide.title.slice(0, 80),
-      desc: slide.desc.slice(0, 160),
-    }));
+    return drafts.map((slide, idx) => normalizeSlideDraft(slide, idx, count));
   }
 
-  async function createSlidesWithAi(count: number): Promise<Slide[]> {
+  function normalizeSlideDraft(slide: AiSlideDraft | { title: string; subtitle: string; content: string[]; visual: string }, idx: number, total: number): PresentationSlide {
+    const fallback = SLIDE_TEMPLATES[idx % SLIDE_TEMPLATES.length];
+    const content = sanitizeList('content' in slide ? slide.content : undefined, fallback.content);
+    const layout = normalizeLayout('layout' in slide ? slide.layout : undefined, idx, total);
+    const title = typeof slide.title === 'string' && slide.title.trim() ? slide.title.trim() : fallback.title;
+    const subtitle = typeof slide.subtitle === 'string' && slide.subtitle.trim() ? slide.subtitle.trim() : fallback.subtitle;
+    const visual = typeof slide.visual === 'string' && slide.visual.trim() ? slide.visual.trim() : fallback.visual;
+    const rawVisualPrompt = 'visualPrompt' in slide ? slide.visualPrompt : undefined;
+    const visualPrompt = typeof rawVisualPrompt === 'string' && rawVisualPrompt.trim()
+      ? rawVisualPrompt.trim()
+      : `${visual} for presentation about ${topic}, ${selectedTemplate?.templateName ?? 'modern clean style'}`;
+
+    return {
+      id: idx + 1,
+      number: idx + 1,
+      title: title.slice(0, 92),
+      subtitle: subtitle.slice(0, 150),
+      content,
+      layout,
+      visual,
+      visualPrompt,
+      stats: normalizeStats(slide, content),
+      comparison: normalizeComparison(slide, content),
+      timeline: normalizeTimeline(slide, content),
+    };
+  }
+
+  function normalizeStats(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideStat[] {
+    const source = 'stats' in slide && Array.isArray(slide.stats) ? slide.stats : [];
+    const stats = source
+      .filter((item): item is { value?: unknown; label?: unknown } => Boolean(item && typeof item === 'object'))
+      .map(item => ({
+        value: typeof item.value === 'string' ? item.value.slice(0, 12) : '3x',
+        label: typeof item.label === 'string' ? item.label.slice(0, 52) : 'важный показатель',
+      }))
+      .slice(0, 3);
+    return stats.length ? stats : content.slice(0, 3).map((item, idx) => ({ value: ['3', '7', '90%'][idx] ?? `${idx + 1}`, label: item }));
+  }
+
+  function normalizeTimeline(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideTimelineItem[] {
+    const source = 'timeline' in slide && Array.isArray(slide.timeline) ? slide.timeline : [];
+    const timeline = source
+      .filter((item): item is { label?: unknown; text?: unknown } => Boolean(item && typeof item === 'object'))
+      .map((item, idx) => ({
+        label: typeof item.label === 'string' ? item.label.slice(0, 18) : `Этап ${idx + 1}`,
+        text: typeof item.text === 'string' ? item.text.slice(0, 72) : content[idx] ?? 'Ключевой этап',
+      }))
+      .slice(0, 4);
+    return timeline.length ? timeline : content.slice(0, 4).map((item, idx) => ({ label: `Этап ${idx + 1}`, text: item }));
+  }
+
+  function normalizeComparison(slide: AiSlideDraft | { content: string[] }, content: string[]): SlideComparison | undefined {
+    const comparison = 'comparison' in slide ? slide.comparison : undefined;
+    if (comparison && typeof comparison === 'object') {
+      const maybe = comparison as { leftTitle?: unknown; left?: unknown; rightTitle?: unknown; right?: unknown };
+      return {
+        leftTitle: typeof maybe.leftTitle === 'string' ? maybe.leftTitle.slice(0, 36) : 'Подход A',
+        left: sanitizeList(maybe.left, content.slice(0, 3)),
+        rightTitle: typeof maybe.rightTitle === 'string' ? maybe.rightTitle.slice(0, 36) : 'Подход B',
+        right: sanitizeList(maybe.right, content.slice(1, 4)),
+      };
+    }
+
+    return {
+      leftTitle: 'Плюсы',
+      left: content.slice(0, 3),
+      rightTitle: 'Важно учесть',
+      right: content.slice(1, 4).length ? content.slice(1, 4) : content,
+    };
+  }
+
+  async function createSlidesWithAi(count: number): Promise<PresentationSlide[]> {
     const styleText = selectedTemplate
       ? `Выбранный дизайн: ${selectedTemplate.templateName}, стиль ${selectedTemplate.style}, цвета ${selectedTemplate.colors.join(', ')}.`
       : 'Дизайн не выбран, подбери нейтральный современный стиль.';
@@ -158,16 +227,18 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       `Тема презентации: ${topic}`,
       `Количество слайдов: ${count}`,
       styleText,
-      'Сделай логичный план презентации: от введения к примерам, выводам и финальному слайду.',
-      'Каждый слайд должен подходить к теме, а описание должно объяснять, что примерно будет на слайде.',
-      'Верни только JSON-массив без markdown.',
-      'Формат каждого элемента: {"title":"короткий заголовок","desc":"1 короткое описание слайда"}.',
+      'Создай профессиональную структуру презентации как Gamma/Canva AI, не просто текст.',
+      'Верни только JSON-объект без markdown в формате {"slides":[...]}.',
+      'Каждый слайд: {"number":1,"title":"...","subtitle":"...","content":["коротко","коротко","коротко"],"layout":"title|text-image|cards|timeline|statistics|comparison|conclusion","visual":"что видно на слайде","visualPrompt":"точный промпт для иллюстрации","stats":[{"value":"75%","label":"..."}],"comparison":{"leftTitle":"...","left":["..."],"rightTitle":"...","right":["..."]},"timeline":[{"label":"...","text":"..."}]}.',
+      'Используй разные layout: первый title, последний conclusion, между ними text-image, cards, timeline, statistics, comparison.',
+      'Текст должен быть короткий, читаемый, без длинных абзацев. Каждый visualPrompt должен описывать конкретную иллюстрацию, а не случайные слова.',
+      'Дизайн и визуальные подсказки должны соответствовать выбранному шаблону.',
     ].join('\n');
 
     const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
       body: {
         prompt,
-        system: 'Ты помогаешь школьнику создать понятную структуру презентации. Пиши на русском, кратко и по делу.',
+        system: 'Ты senior AI presentation designer. Создавай русскоязычные слайды с разными layout, визуальной иерархией, коротким текстом и точными visualPrompt. Возвращай только валидный JSON.',
       },
     });
 
@@ -267,8 +338,17 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     return () => clearInterval(id);
   }, [step, topic]);
 
-  function updateSlide(id: number, field: 'title' | 'desc', value: string) {
-    setSlides(s => s.map(sl => sl.id === id ? { ...sl, [field]: value } : sl));
+  function updateSlide(id: number, field: 'title' | 'subtitle' | 'content', value: string) {
+    setSlides(s => s.map(sl => {
+      if (sl.id !== id) return sl;
+      if (field === 'content') {
+        return {
+          ...sl,
+          content: value.split('\n').map(item => item.trim()).filter(Boolean).slice(0, 4),
+        };
+      }
+      return { ...sl, [field]: value };
+    }));
   }
 
   function safeFileName() {
@@ -503,7 +583,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
               </span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--soft)', marginBottom: 18 }}>
-              Можно редактировать названия и описания перед созданием
+              Можно редактировать названия, подзаголовки и ключевые блоки перед созданием
             </p>
             {aiNotice && <p className="pres-ai-notice structure">{aiNotice}</p>}
 
@@ -521,6 +601,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                     {sl.id}
                   </div>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div className="pres-slide-layout-pill">{sl.layout}</div>
                     <input
                       className="pres-slide-input"
                       value={sl.title}
@@ -529,8 +610,15 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                     />
                     <input
                       className="pres-slide-input"
-                      value={sl.desc}
-                      onChange={e => updateSlide(sl.id, 'desc', e.target.value)}
+                      value={sl.subtitle}
+                      onChange={e => updateSlide(sl.id, 'subtitle', e.target.value)}
+                      style={{ fontSize: 12, color: 'var(--soft)' }}
+                    />
+                    <textarea
+                      className="pres-slide-input pres-slide-textarea"
+                      value={sl.content.join('\n')}
+                      onChange={e => updateSlide(sl.id, 'content', e.target.value)}
+                      rows={2}
                       style={{ fontSize: 12, color: 'var(--soft)' }}
                     />
                   </div>
@@ -591,224 +679,18 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
 
         {/* ── STEP 5: preview ── */}
         {step === 'preview' && (
-          <div>
-            <div className="pres-preview-header">
-              <div>
-                <p className="pres-modal-title" style={{ textAlign: 'left', marginBottom: 4 }}>Предпросмотр презентации</p>
-                <p style={{ fontSize: 13, color: 'var(--soft)' }}>
-                  «{topic}» · {slides.length} слайдов{selectedTemplate ? ` · ${selectedTemplate.templateName}` : ''}
-                </p>
-              </div>
-              <div className="pres-download-wrap">
-                <button className="pres-download-main" onClick={() => setDownloadOpen(v => !v)}>
-                  Скачать
-                  <span aria-hidden="true">⌄</span>
-                </button>
-                {downloadOpen && (
-                  <div className="pres-download-menu">
-                    <button onClick={() => downloadPresentation('pdf')}>Скачать PDF</button>
-                    <button onClick={() => downloadPresentation('pptx')}>Скачать PPTX</button>
-                  </div>
-                )}
-              </div>
-            </div>
-            {downloadStatus && <p className="pres-download-status">{downloadStatus}</p>}
-            <div className="pres-preview-grid">
-              {slides.map((slide, index) => (
-                <div key={slide.id} className="pres-preview-card">
-                  <SlidePreview
-                    slide={slide}
-                    index={index}
-                    total={slides.length}
-                    topic={topic}
-                    theme={theme}
-                  />
-                  <div className="pres-preview-caption">Слайд {index + 1}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PresentationPreview
+            slides={slides}
+            topic={topic}
+            theme={theme}
+            selectedTemplateName={selectedTemplate?.templateName}
+            downloadOpen={downloadOpen}
+            downloadStatus={downloadStatus}
+            onToggleDownload={() => setDownloadOpen(v => !v)}
+            onDownload={downloadPresentation}
+          />
         )}
       </div>
     </div>
   );
-}
-
-function getPresentationTheme(template: SelectedTemplate | null): PresTheme {
-  const name = template?.templateName ?? 'Planify Blue';
-  const colors = template?.colors ?? ['#2563EB', '#7C3AED', '#DBEAFE'];
-  const darkNames = ['Neon Future', 'Business Pro'];
-  const minimalNames = ['Minimal White', 'Academic Clean'];
-  const dark = darkNames.includes(name);
-
-  if (minimalNames.includes(name)) {
-    return {
-      name,
-      bg: '#FFFFFF',
-      primary: colors[2] ?? '#2563EB',
-      secondary: '#F8FAFC',
-      accent: colors[1] ?? '#CBD5E1',
-      text: '#0F172A',
-      muted: '#64748B',
-      dark: false,
-    };
-  }
-
-  return {
-    name,
-    bg: colors[0] ?? '#2563EB',
-    primary: colors[0] ?? '#2563EB',
-    secondary: colors[1] ?? '#7C3AED',
-    accent: colors[2] ?? '#DBEAFE',
-    text: dark ? '#F8FAFC' : '#FFFFFF',
-    muted: dark ? '#CBD5E1' : 'rgba(255,255,255,0.78)',
-    dark,
-  };
-}
-
-function SlidePreview({
-  slide,
-  index,
-  total,
-  topic,
-  theme,
-}: {
-  slide: Slide;
-  index: number;
-  total: number;
-  topic: string;
-  theme: PresTheme;
-}) {
-  const isLight = !theme.dark && (theme.bg === '#FFFFFF' || theme.bg === '#F8FAFC');
-  return (
-    <div
-      className="pres-slide-preview"
-      style={{
-        background: isLight
-          ? `linear-gradient(135deg, ${theme.bg} 0%, ${theme.secondary} 100%)`
-          : `radial-gradient(circle at 82% 18%, ${theme.accent}66, transparent 30%), linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
-        color: theme.text,
-      }}
-    >
-      <div className="pres-slide-preview-top">
-        <span>{topic}</span>
-        <span>{String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
-      </div>
-      <div className="pres-slide-preview-body">
-        <div>
-          <div className="pres-slide-preview-kicker" style={{ color: isLight ? theme.primary : theme.accent }}>
-            {theme.name}
-          </div>
-          <h3 style={{ color: isLight ? '#0F172A' : theme.text }}>{slide.title}</h3>
-          <p style={{ color: isLight ? '#475569' : theme.muted }}>{slide.desc}</p>
-        </div>
-        <div className="pres-slide-preview-art" style={{ borderColor: isLight ? '#CBD5E1' : 'rgba(255,255,255,0.36)' }}>
-          <span style={{ background: theme.primary }} />
-          <span style={{ background: theme.secondary }} />
-          <span style={{ background: theme.accent }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let line = '';
-  words.forEach(word => {
-    const next = line ? `${line} ${word}` : word;
-    if (ctx.measureText(next).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
-  });
-  if (line) lines.push(line);
-  return lines;
-}
-
-function renderSlideToImage(slide: Slide, index: number, total: number, topic: string, theme: PresTheme): string {
-  const canvas = document.createElement('canvas');
-  canvas.width = SLIDE_W;
-  canvas.height = SLIDE_H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas недоступен');
-
-  const gradient = ctx.createLinearGradient(0, 0, SLIDE_W, SLIDE_H);
-  gradient.addColorStop(0, theme.bg);
-  gradient.addColorStop(0.58, theme.primary);
-  gradient.addColorStop(1, theme.secondary);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, SLIDE_W, SLIDE_H);
-
-  ctx.globalAlpha = 0.26;
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.arc(1080, 130, 180, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(180, 620, 220, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  const light = theme.bg === '#FFFFFF' || theme.bg === '#F8FAFC';
-  const titleColor = light ? '#0F172A' : theme.text;
-  const textColor = light ? '#475569' : theme.muted;
-
-  ctx.fillStyle = light ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.13)';
-  roundRect(ctx, 72, 68, SLIDE_W - 144, SLIDE_H - 136, 34);
-  ctx.fill();
-
-  ctx.fillStyle = light ? theme.primary : theme.accent;
-  ctx.font = '700 28px Inter, Arial, sans-serif';
-  ctx.fillText(theme.name.toUpperCase(), 120, 142);
-
-  ctx.fillStyle = light ? '#64748B' : 'rgba(255,255,255,0.72)';
-  ctx.font = '600 24px Inter, Arial, sans-serif';
-  ctx.fillText(`${index + 1}/${total}`, 1080, 142);
-
-  ctx.fillStyle = titleColor;
-  ctx.font = '900 68px Inter, Arial, sans-serif';
-  wrapCanvasText(ctx, slide.title, 770).slice(0, 3).forEach((line, lineIndex) => {
-    ctx.fillText(line, 120, 260 + lineIndex * 76);
-  });
-
-  ctx.fillStyle = textColor;
-  ctx.font = '500 34px Inter, Arial, sans-serif';
-  wrapCanvasText(ctx, slide.desc, 760).slice(0, 4).forEach((line, lineIndex) => {
-    ctx.fillText(line, 120, 500 + lineIndex * 44);
-  });
-
-  ctx.fillStyle = light ? theme.secondary : 'rgba(255,255,255,0.18)';
-  roundRect(ctx, 900, 250, 230, 230, 42);
-  ctx.fill();
-  ctx.fillStyle = theme.accent;
-  roundRect(ctx, 940, 290, 150, 58, 29);
-  ctx.fill();
-  ctx.fillStyle = theme.primary;
-  ctx.beginPath();
-  ctx.arc(1016, 414, 54, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = light ? '#64748B' : 'rgba(255,255,255,0.7)';
-  ctx.font = '600 22px Inter, Arial, sans-serif';
-  ctx.fillText(topic.slice(0, 70), 120, 642);
-
-  return canvas.toDataURL('image/png');
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
 }
