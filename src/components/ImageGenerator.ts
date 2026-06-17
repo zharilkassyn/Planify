@@ -9,7 +9,7 @@ export function buildImagePrompt(
   audience: Audience,
 ) {
   const templateStyle = selectedTemplate
-    ? `${selectedTemplate.templateName} style, ${selectedTemplate.style}, colors ${selectedTemplate.colors.join(', ')}`
+    ? `use the selected presentation visual style internally, ${selectedTemplate.style}`
     : 'modern educational presentation style';
 
   const audienceTone = {

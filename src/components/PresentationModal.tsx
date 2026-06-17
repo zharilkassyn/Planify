@@ -598,7 +598,6 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
             slides={slides}
             topic={topic}
             theme={theme}
-            selectedTemplateName={selectedTemplate?.templateName}
             downloadOpen={downloadOpen}
             downloadStatus={downloadStatus}
             onToggleDownload={() => setDownloadOpen(v => !v)}

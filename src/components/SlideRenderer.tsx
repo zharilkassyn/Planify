@@ -29,7 +29,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
   return (
     <article className={`slide-renderer slide-${slide.layout}${compact ? ' compact' : ''}`} style={style}>
       <div className="slide-chrome">
-        <span>{theme.name}</span>
+        <span>{topic}</span>
         <span>{String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </div>
 
@@ -47,7 +47,7 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
       {slide.layout === 'text-image' && (
         <div className="slide-layout-text-image">
           <div>
-            <span className="slide-kicker">{slide.visual}</span>
+            <span className="slide-kicker">{topic}</span>
             <h2>{slide.title}</h2>
             <p>{slide.subtitle}</p>
             <ul>
@@ -60,10 +60,13 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'cards' && (
         <div className="slide-layout-cards">
-          <div className="slide-heading">
-            <span className="slide-kicker">{slide.visual}</span>
-            <h2>{slide.title}</h2>
-            <p>{slide.subtitle}</p>
+          <div className="slide-heading with-visual">
+            <div>
+              <span className="slide-kicker">{topic}</span>
+              <h2>{slide.title}</h2>
+              <p>{slide.subtitle}</p>
+            </div>
+            <VisualBlock slide={slide} theme={theme} />
           </div>
           <div className="slide-card-grid">
             {slide.content.slice(0, 4).map((item, itemIndex) => (
@@ -78,10 +81,13 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'timeline' && (
         <div className="slide-layout-timeline">
-          <div className="slide-heading">
-            <span className="slide-kicker">{slide.visual}</span>
-            <h2>{slide.title}</h2>
-            <p>{slide.subtitle}</p>
+          <div className="slide-heading with-visual">
+            <div>
+              <span className="slide-kicker">{topic}</span>
+              <h2>{slide.title}</h2>
+              <p>{slide.subtitle}</p>
+            </div>
+            <VisualBlock slide={slide} theme={theme} />
           </div>
           <div className="slide-timeline-line">
             {slide.timeline.slice(0, 4).map(item => (
@@ -96,10 +102,13 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'statistics' && (
         <div className="slide-layout-statistics">
-          <div className="slide-heading">
-            <span className="slide-kicker">{slide.visual}</span>
-            <h2>{slide.title}</h2>
-            <p>{slide.subtitle}</p>
+          <div className="slide-heading with-visual">
+            <div>
+              <span className="slide-kicker">{topic}</span>
+              <h2>{slide.title}</h2>
+              <p>{slide.subtitle}</p>
+            </div>
+            <VisualBlock slide={slide} theme={theme} />
           </div>
           <div className="slide-stat-grid">
             {slide.stats.slice(0, 3).map((stat, statIndex) => (
@@ -115,10 +124,13 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'comparison' && (
         <div className="slide-layout-comparison">
-          <div className="slide-heading">
-            <span className="slide-kicker">{slide.visual}</span>
-            <h2>{slide.title}</h2>
-            <p>{slide.subtitle}</p>
+          <div className="slide-heading with-visual">
+            <div>
+              <span className="slide-kicker">{topic}</span>
+              <h2>{slide.title}</h2>
+              <p>{slide.subtitle}</p>
+            </div>
+            <VisualBlock slide={slide} theme={theme} />
           </div>
           <div className="slide-comparison-grid">
             <ComparisonColumn title={slide.comparison?.leftTitle ?? 'Подход 1'} items={slide.comparison?.left ?? slide.content.slice(0, 3)} />
@@ -129,17 +141,19 @@ export function SlideRenderer({ slide, index, total, topic, theme, compact = fal
 
       {slide.layout === 'quote' && (
         <div className="slide-layout-quote">
-          <div className="slide-quote-mark">“</div>
-          <blockquote>{slide.quote ?? slide.subtitle}</blockquote>
-          <span>{slide.attribution ?? topic}</span>
-          <p>{slide.visual}</p>
+          <VisualBlock slide={slide} theme={theme} />
+          <div>
+            <div className="slide-quote-mark">“</div>
+            <blockquote>{slide.quote ?? slide.subtitle}</blockquote>
+            <span>{slide.attribution ?? topic}</span>
+          </div>
         </div>
       )}
 
       {slide.layout === 'summary' && (
         <div className="slide-layout-summary">
           <div>
-            <span className="slide-kicker">{slide.visual}</span>
+            <span className="slide-kicker">{topic}</span>
             <h2>{slide.title}</h2>
             <p>{slide.subtitle}</p>
           </div>
@@ -164,13 +178,12 @@ function ComparisonColumn({ title, items }: { title: string; items: string[] }) 
 function VisualBlock({ slide, theme, large = false }: { slide: PresentationSlide; theme: PresentationTheme; large?: boolean }) {
   return (
     <div className={`slide-visual-block${large ? ' large' : ''}`} aria-label={slide.visualPrompt}>
-      <div className="slide-visual-orbit" />
-      <div className="slide-visual-core">
+      <div className="slide-photo-haze" />
+      <div className="slide-photo-subject">
         <span style={{ background: theme.primary }} />
         <span style={{ background: theme.secondary }} />
         <span style={{ background: theme.accent }} />
       </div>
-      <p>{slide.visual}</p>
     </div>
   );
 }
@@ -189,7 +202,7 @@ export function renderSlideToImage(
   if (!ctx) throw new Error('Canvas недоступен');
 
   paintBackground(ctx, theme);
-  paintChrome(ctx, theme, index, total);
+  paintChrome(ctx, theme, index, total, topic);
 
   switch (slide.layout) {
     case 'title':
@@ -249,10 +262,10 @@ function paintBackground(ctx: CanvasRenderingContext2D, theme: PresentationTheme
   ctx.globalAlpha = 1;
 }
 
-function paintChrome(ctx: CanvasRenderingContext2D, theme: PresentationTheme, index: number, total: number) {
+function paintChrome(ctx: CanvasRenderingContext2D, theme: PresentationTheme, index: number, total: number, topic: string) {
   ctx.fillStyle = theme.dark ? 'rgba(255,255,255,0.72)' : '#64748B';
   ctx.font = '700 22px Inter, Arial, sans-serif';
-  ctx.fillText(theme.name.toUpperCase(), 78, 70);
+  ctx.fillText(topic.slice(0, 56).toUpperCase(), 78, 70);
   ctx.textAlign = 'right';
   ctx.fillText(`${index + 1}/${total}`, 1202, 70);
   ctx.textAlign = 'left';
@@ -263,20 +276,21 @@ function paintTitle(ctx: CanvasRenderingContext2D, slide: PresentationSlide, top
   paintKicker(ctx, topic, 120, 180, theme);
   paintHeading(ctx, slide.title, 120, 270, 650, 72, theme);
   paintBody(ctx, slide.subtitle, 120, 485, 620, 34, theme, 2);
-  paintVisual(ctx, 830, 210, 260, theme, slide.visual);
+  paintVisual(ctx, 830, 210, 260, theme);
 }
 
 function paintTextImage(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
-  paintKicker(ctx, slide.visual, 84, 145, theme);
+  paintKicker(ctx, 'Ключевые идеи', 84, 145, theme);
   paintHeading(ctx, slide.title, 84, 220, 640, 58, theme);
   paintBody(ctx, slide.subtitle, 84, 342, 610, 28, theme, 2);
   paintBullets(ctx, slide.content, 100, 440, 600, theme);
-  paintVisual(ctx, 825, 210, 260, theme, slide.visual);
+  paintVisual(ctx, 825, 210, 260, theme);
 }
 
 function paintCards(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintHeading(ctx, slide.title, 84, 156, 880, 54, theme);
   paintBody(ctx, slide.subtitle, 84, 246, 780, 26, theme, 2);
+  paintVisual(ctx, 955, 132, 150, theme);
   slide.content.slice(0, 4).forEach((item, idx) => {
     const x = 84 + (idx % 2) * 560;
     const y = 350 + Math.floor(idx / 2) * 138;
@@ -289,6 +303,7 @@ function paintCards(ctx: CanvasRenderingContext2D, slide: PresentationSlide, the
 function paintTimeline(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintHeading(ctx, slide.title, 84, 158, 900, 54, theme);
   paintBody(ctx, slide.subtitle, 84, 246, 760, 26, theme, 2);
+  paintVisual(ctx, 955, 128, 150, theme);
   ctx.strokeStyle = theme.dark ? 'rgba(255,255,255,0.34)' : theme.line;
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -309,6 +324,7 @@ function paintTimeline(ctx: CanvasRenderingContext2D, slide: PresentationSlide, 
 function paintStatistics(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintHeading(ctx, slide.title, 84, 150, 850, 52, theme);
   paintBody(ctx, slide.subtitle, 84, 236, 760, 26, theme, 2);
+  paintVisual(ctx, 955, 124, 150, theme);
   slide.stats.slice(0, 3).forEach((stat, idx) => {
     const x = 84 + idx * 380;
     paintPanel(ctx, x, 345, 320, 210, theme);
@@ -325,6 +341,7 @@ function paintStatistics(ctx: CanvasRenderingContext2D, slide: PresentationSlide
 function paintComparison(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintHeading(ctx, slide.title, 84, 145, 900, 52, theme);
   paintBody(ctx, slide.subtitle, 84, 230, 760, 26, theme, 2);
+  paintVisual(ctx, 965, 124, 140, theme);
   const left = slide.comparison?.left ?? slide.content.slice(0, 3);
   const right = slide.comparison?.right ?? slide.content.slice(1, 4);
   paintCompareColumn(ctx, slide.comparison?.leftTitle ?? 'Подход 1', left, 110, 330, theme);
@@ -338,12 +355,12 @@ function paintQuote(ctx: CanvasRenderingContext2D, slide: PresentationSlide, the
   ctx.fillText('“', 135, 238);
   paintHeading(ctx, slide.quote ?? slide.subtitle, 210, 300, 780, 54, theme);
   paintBody(ctx, slide.attribution ?? slide.visual, 214, 500, 620, 28, theme, 1);
-  paintVisual(ctx, 940, 250, 150, theme, slide.visual);
+  paintVisual(ctx, 940, 250, 150, theme);
 }
 
 function paintSummary(ctx: CanvasRenderingContext2D, slide: PresentationSlide, theme: PresentationTheme) {
   paintPanel(ctx, 78, 104, 1124, 540, theme);
-  paintKicker(ctx, slide.visual, 126, 176, theme);
+  paintKicker(ctx, 'Итоги', 126, 176, theme);
   paintHeading(ctx, slide.title, 126, 262, 760, 64, theme);
   paintBody(ctx, slide.subtitle, 126, 402, 720, 30, theme, 2);
   slide.content.slice(0, 4).forEach((item, idx) => {
@@ -398,21 +415,30 @@ function paintBullets(ctx: CanvasRenderingContext2D, items: string[], x: number,
   });
 }
 
-function paintVisual(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, theme: PresentationTheme, label: string) {
+function paintVisual(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, theme: PresentationTheme) {
   paintPanel(ctx, x, y, size, size, theme);
-  ctx.strokeStyle = theme.dark ? 'rgba(255,255,255,0.34)' : theme.line;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(x + size / 2, y + size / 2, size * 0.34, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = theme.primary;
-  ctx.beginPath();
-  ctx.arc(x + size / 2, y + size / 2, size * 0.18, 0, Math.PI * 2);
+  const photoGradient = ctx.createLinearGradient(x, y, x + size, y + size);
+  photoGradient.addColorStop(0, theme.primary);
+  photoGradient.addColorStop(0.52, theme.secondary);
+  photoGradient.addColorStop(1, theme.accent);
+  ctx.fillStyle = photoGradient;
+  roundRect(ctx, x + 14, y + 14, size - 28, size - 28, 28);
   ctx.fill();
-  ctx.fillStyle = theme.secondary;
-  roundRect(ctx, x + 38, y + size - 72, size - 76, 24, 12);
+  ctx.globalAlpha = 0.36;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(x + size * 0.72, y + size * 0.28, size * 0.2, 0, Math.PI * 2);
   ctx.fill();
-  paintBody(ctx, label, x + 32, y + size + 48, size - 64, 22, theme, 1);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = theme.dark ? 'rgba(255,255,255,0.88)' : 'rgba(15,23,42,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(x + size * 0.18, y + size * 0.78);
+  ctx.lineTo(x + size * 0.42, y + size * 0.48);
+  ctx.lineTo(x + size * 0.58, y + size * 0.66);
+  ctx.lineTo(x + size * 0.74, y + size * 0.42);
+  ctx.lineTo(x + size * 0.88, y + size * 0.78);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

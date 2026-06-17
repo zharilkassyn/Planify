@@ -10,7 +10,6 @@ interface PresentationPreviewProps {
   slides: PresentationSlide[];
   topic: string;
   theme: PresentationTheme;
-  selectedTemplateName?: string;
   downloadOpen: boolean;
   downloadStatus: string;
   onToggleDownload: () => void;
@@ -21,7 +20,6 @@ export function PresentationPreview({
   slides,
   topic,
   theme,
-  selectedTemplateName,
   downloadOpen,
   downloadStatus,
   onToggleDownload,
@@ -42,7 +40,7 @@ export function PresentationPreview({
         <div>
           <p className="pres-modal-title" style={{ textAlign: 'left', marginBottom: 4 }}>Предпросмотр презентации</p>
           <p style={{ fontSize: 13, color: 'var(--soft)' }}>
-            «{topic}» · {slides.length} слайдов{selectedTemplateName ? ` · ${selectedTemplateName}` : ''}
+            «{topic}» · {slides.length} слайдов
           </p>
         </div>
         <div className="pres-download-wrap">
@@ -96,7 +94,7 @@ export function PresentationPreview({
       <div className="presentation-preview-meta">
         <strong>Слайд {activeIndex + 1}</strong>
         <span>{getLayoutLabel(activeSlide.layout)}</span>
-        <span>{activeSlide.visualPrompt}</span>
+        <span>{activeSlide.title}</span>
       </div>
 
       <div className="presentation-thumbnails" aria-label="Миниатюры слайдов">
