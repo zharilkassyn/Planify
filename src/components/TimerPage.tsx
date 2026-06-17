@@ -90,6 +90,18 @@ export function TimerPage() {
   const startedAtRef = useRef<number | undefined>(saved?.running ? saved.startedAt : undefined);
   const totalSecRef  = useRef<number | undefined>(saved?.running ? saved.totalSec  : undefined);
 
+  useEffect(() => {
+    const next = loadTimerState();
+    if (!next?.running || !next.startedAt || !next.totalSec) return;
+    setMode(next.mode);
+    setCustomMins(next.customMins);
+    startedAtRef.current = next.startedAt;
+    totalSecRef.current = next.totalSec;
+    const elapsed = Math.floor((Date.now() - next.startedAt) / 1000);
+    setTimeLeft(Math.max(0, next.totalSec - elapsed));
+    setRunning(next.totalSec - elapsed > 0);
+  }, []);
+
   // Load tasks
   useEffect(() => {
     supabase.from('entries').select('id, title, completed').order('created_at', { ascending: false })

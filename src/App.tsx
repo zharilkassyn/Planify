@@ -219,7 +219,7 @@ export default function App() {
 
       {activeNav !== 'Таймер' && <FloatingTimer onNavigate={setActiveNav} />}
       <main className="main-content">
-        {activeNav === 'Планировщик' ? <Planner /> : activeNav === 'Таймер' ? <TimerPage /> : activeNav === 'Прогресс' ? <ProgressPage /> : activeNav === 'ИИ-помощник' ? <AIPage /> : activeNav === 'Флеш-карты' ? <FlashCards /> : activeNav === 'Заметки' ? <NotesPage /> : activeNav === 'Генерация презентаций' ? <PresentationsPage /> : activeNav === 'Настройки' ? <SettingsPage displayName={displayName} email={email} onNameChange={setDisplayName} avatarColor={avatarColor} onAvatarColorChange={handleAvatarColor} avatarImg={avatarImg} onAvatarImgChange={handleAvatarImg} theme={theme} onThemeChange={handleThemeChange} /> : <Entries userEmail={displayName} onNavigate={setActiveNav} />}
+        {activeNav === 'Планировщик' ? <Planner /> : activeNav === 'Таймер' ? <TimerPage /> : activeNav === 'Прогресс' ? <ProgressPage /> : activeNav === 'ИИ-помощник' ? <AIPage onNavigate={setActiveNav} /> : activeNav === 'Флеш-карты' ? <FlashCards /> : activeNav === 'Заметки' ? <NotesPage /> : activeNav === 'Генерация презентаций' ? <PresentationsPage /> : activeNav === 'Настройки' ? <SettingsPage displayName={displayName} email={email} onNameChange={setDisplayName} avatarColor={avatarColor} onAvatarColorChange={handleAvatarColor} avatarImg={avatarImg} onAvatarImgChange={handleAvatarImg} theme={theme} onThemeChange={handleThemeChange} /> : <Entries userEmail={displayName} onNavigate={setActiveNav} />}
       </main>
     </div>
   );

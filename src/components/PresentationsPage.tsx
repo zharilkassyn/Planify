@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PresentationModal } from './PresentationModal';
 import { TemplateGallery, PRESENTATION_TEMPLATES, type SelectedTemplate } from './TemplateGallery';
 
@@ -61,6 +61,7 @@ const CARD_COLORS = ['#2D6A4F', '#1E3A5F', '#4C1D95', '#92400E', '#1E3A8A', '#06
 
 const STORAGE_KEY = 'planify_presentations';
 const SELECTED_TEMPLATE_KEY = 'planify_selected_template';
+const PRESENTATION_DRAFT_KEY = 'planify_presentation_draft_topic';
 
 interface Presentation {
   id: string;
@@ -146,6 +147,14 @@ export function PresentationsPage() {
 
   const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB';
   const sidebarTemplates = PRESENTATION_TEMPLATES.slice(0, 4);
+
+  useEffect(() => {
+    const draftTopic = localStorage.getItem(PRESENTATION_DRAFT_KEY);
+    if (!draftTopic) return;
+    setTopic(draftTopic);
+    setFormError('');
+    localStorage.removeItem(PRESENTATION_DRAFT_KEY);
+  }, []);
 
   function handleModalDone(title: string, _count: number) {
     const newItem: Presentation = {

@@ -9,6 +9,18 @@ type PlannerDraftEvent = {
   event_date: string;
   color: string;
 };
+type AppSection =
+  | 'Главная'
+  | 'Планировщик'
+  | 'Таймер'
+  | 'Прогресс'
+  | 'ИИ-помощник'
+  | 'Флеш-карты'
+  | 'Заметки'
+  | 'Генерация презентаций'
+  | 'Настройки';
+type FlashcardDraft = { question: string; answer: string };
+type FlashcardAiResponse = { deckName: string; description: string; cards: FlashcardDraft[] };
 type Message = {
   id: string;
   role: 'user' | 'ai';
@@ -33,6 +45,8 @@ const CAPABILITIES = [
 const QUICK = ['Сделать конспект', 'Создать флеш-карты', 'Объяснить тему', 'Создать тест'];
 const SCHEDULE_WORDS = ['расписан', 'план на день', 'план на неделю', 'запланируй', 'добавь в планировщик'];
 const EVENT_COLORS = ['#2563EB', '#0284C7', '#6366F1', '#0D9488', '#F59E0B', '#EF4444'];
+const PRESENTATION_DRAFT_KEY = 'planify_presentation_draft_topic';
+const TIMER_KEY = 'planify_timer_state';
 
 function getTime() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -53,6 +67,18 @@ function todayString() {
 function isScheduleRequest(text: string) {
   const lower = text.toLowerCase();
   return SCHEDULE_WORDS.some(word => lower.includes(word));
+}
+
+function includesAny(text: string, words: string[]) {
+  const lower = text.toLowerCase();
+  return words.some(word => lower.includes(word));
+}
+
+function extractTopic(text: string) {
+  return text
+    .replace(/сделай|создай|составь|открой|перейди|презентац(ию|ия|ии)|флеш[-\s]?карты|карточки|заметку|конспект|таймер|включи|запусти/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const STORAGE_KEY = 'planify_chats';
@@ -173,7 +199,42 @@ async function askAiForSchedule(prompt: string): Promise<AiScheduleResponse> {
   return parseScheduleResponse(response);
 }
 
-export function AIPage() {
+function isFlashcardDraft(value: unknown): value is FlashcardDraft {
+  if (!value || typeof value !== 'object') return false;
+  const card = value as Partial<FlashcardDraft>;
+  return typeof card.question === 'string' && typeof card.answer === 'string';
+}
+
+async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> {
+  const response = await askAi([
+    `Запрос пользователя: ${prompt}`,
+    'Создай учебную колоду флеш-карт.',
+    'Верни только JSON без markdown.',
+    'Формат: {"deckName":"название","description":"краткое описание","cards":[{"question":"вопрос","answer":"ответ"}]}',
+    'Сделай 8-12 карточек. Вопросы и ответы должны быть короткими и полезными.',
+  ].join('\n'));
+
+  const cleanText = stripCodeFence(response);
+  const start = cleanText.indexOf('{');
+  const end = cleanText.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) throw new Error('ИИ не вернул JSON для флеш-карт');
+
+  const parsed = JSON.parse(cleanText.slice(start, end + 1)) as Partial<FlashcardAiResponse>;
+  const cards = Array.isArray(parsed.cards) ? parsed.cards.filter(isFlashcardDraft).slice(0, 12) : [];
+  if (!parsed.deckName || cards.length === 0) throw new Error('ИИ не смог создать флеш-карты');
+
+  return {
+    deckName: parsed.deckName.slice(0, 80),
+    description: (parsed.description ?? 'Колода создана ИИ').slice(0, 180),
+    cards,
+  };
+}
+
+interface AIPageProps {
+  onNavigate?: (section: AppSection) => void;
+}
+
+export function AIPage({ onNavigate }: AIPageProps) {
   const [chats,      setChats]      = useState<Chat[]>(loadChats);
   const [activeChatId, setActiveChat] = useState<string | null>(chats[0]?.id ?? null);
   const [input,      setInput]      = useState('');
@@ -219,6 +280,7 @@ export function AIPage() {
     messageId: string,
     text: string,
     schedule?: PlannerDraftEvent[],
+    addedToPlanner = false,
   ) {
     const chunks = getTypingChunks(text);
     let visibleText = '';
@@ -229,7 +291,7 @@ export function AIPage() {
       await new Promise(resolve => window.setTimeout(resolve, 18));
     }
 
-    updateAiMessage(chatId, messageId, message => ({ ...message, content: text, schedule }));
+    updateAiMessage(chatId, messageId, message => ({ ...message, content: text, schedule, addedToPlanner }));
   }
 
   function newChat() {
@@ -274,11 +336,78 @@ export function AIPage() {
     setTyping(true);
     let aiContent = '';
     let schedule: PlannerDraftEvent[] | undefined;
+    let targetNav: AppSection | undefined;
+    let scheduleAlreadyAdded = false;
     try {
-      if (isScheduleRequest(content)) {
+      const lower = content.toLowerCase();
+      if (includesAny(lower, ['презентац'])) {
+        const presentationTopic = extractTopic(content) || content;
+        localStorage.setItem(PRESENTATION_DRAFT_KEY, presentationTopic);
+        targetNav = 'Генерация презентаций';
+        aiContent = `Открыл вкладку генерации презентаций и перенёс тему: «${presentationTopic}». Там можно выбрать шаблон, количество слайдов и создать презентацию.`;
+      } else if (includesAny(lower, ['таймер', 'помодоро', 'фокус'])) {
+        const now = Date.now();
+        const totalSec = 25 * 60;
+        localStorage.setItem(TIMER_KEY, JSON.stringify({
+          mode: 'focus',
+          running: true,
+          startedAt: now,
+          totalSec,
+          customMins: { focus: 25, short: 5, long: 15 },
+        }));
+        targetNav = 'Таймер';
+        aiContent = 'Запустил фокус-таймер на 25 минут и открыл вкладку “Таймер”.';
+      } else if (includesAny(lower, ['флеш', 'карточк'])) {
+        const deck = await askAiForFlashcards(content);
+        const { data, error } = await supabase.from('flashcard_decks')
+          .insert({ name: deck.deckName, description: deck.description, color: EVENT_COLORS[0] })
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error('Не получилось создать колоду');
+        const { error: cardsError } = await supabase.from('flashcards').insert(
+          deck.cards.map(card => ({
+            deck_id: data.id,
+            question: card.question,
+            answer: card.answer,
+          })),
+        );
+        if (cardsError) throw new Error(cardsError.message);
+        targetNav = 'Флеш-карты';
+        aiContent = `Создал колоду “${deck.deckName}” (${deck.cards.length} карточек) и открыл вкладку “Флеш-карты”.`;
+      } else if (includesAny(lower, ['заметк', 'конспект'])) {
+        const noteText = await askAi([
+          `Запрос пользователя: ${content}`,
+          'Создай аккуратную учебную заметку/конспект на русском.',
+          'Используй короткие заголовки, списки и понятные формулировки.',
+        ].join('\n'));
+        const title = extractTopic(content).slice(0, 70) || 'Заметка от ИИ';
+        const { error } = await supabase.from('notes').insert({
+          title,
+          content: noteText,
+          tags: ['ai'],
+          is_starred: false,
+        });
+        if (error) throw new Error(error.message);
+        targetNav = 'Заметки';
+        aiContent = `Создал заметку “${title}” и открыл вкладку “Заметки”.`;
+      } else if (isScheduleRequest(content)) {
         const result = await askAiForSchedule(content);
-        aiContent = result.reply;
+        const { error } = await supabase.from('planner_events').insert(
+          result.events.map(event => ({
+            title: event.title,
+            description: event.description,
+            hour: event.hour,
+            end_hour: event.end_hour,
+            color: event.color,
+            event_date: event.event_date,
+          })),
+        );
+        if (error) throw new Error(error.message);
+        aiContent = `${result.reply}\n\nДобавил ${result.events.length} событий в планировщик и открыл вкладку “Планировщик”.`;
         schedule = result.events;
+        scheduleAlreadyAdded = true;
+        targetNav = 'Планировщик';
       } else {
         aiContent = await askAi(content);
       }
@@ -289,7 +418,8 @@ export function AIPage() {
       setTyping(false);
     }
 
-    await typeAiMessage(chatId, aiMessageId, aiContent, schedule);
+    await typeAiMessage(chatId, aiMessageId, aiContent, schedule, scheduleAlreadyAdded);
+    if (targetNav) onNavigate?.(targetNav);
   }
 
   async function addScheduleToPlanner(messageId: string, schedule: PlannerDraftEvent[]) {
