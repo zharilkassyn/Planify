@@ -34,6 +34,27 @@ function saveChats(chats: Chat[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
 }
 
+function getResponseContext(error: unknown): Response | null {
+  if (!error || typeof error !== 'object') return null;
+  const maybeError = error as { context?: unknown };
+  return maybeError.context instanceof Response ? maybeError.context : null;
+}
+
+async function getAiErrorMessage(error: unknown): Promise<string> {
+  const response = getResponseContext(error);
+  if (response) {
+    try {
+      const body = await response.clone().json() as AiFunctionResponse;
+      if (body.error) return body.error;
+    } catch {
+      const text = await response.clone().text();
+      if (text) return text;
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Неизвестная ошибка';
+}
+
 async function askAi(prompt: string): Promise<string> {
   const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
     body: {
@@ -47,7 +68,7 @@ async function askAi(prompt: string): Promise<string> {
     },
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await getAiErrorMessage(error));
   if (data?.error) throw new Error(data.error);
   if (!data?.text?.trim()) throw new Error('ИИ не вернул ответ');
 
@@ -110,7 +131,7 @@ export function AIPage() {
     try {
       aiContent = await askAi(content);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      const message = await getAiErrorMessage(error);
       aiContent = `Не получилось получить ответ от ИИ.\n\nПроверь, что GEMINI_API_KEY добавлен в Supabase Secrets и функция ai задеплоена.\n\nДетали: ${message}`;
     } finally {
       setTyping(false);

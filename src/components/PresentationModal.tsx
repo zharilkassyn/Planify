@@ -84,6 +84,27 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     }));
   }
 
+  function getResponseContext(error: unknown): Response | null {
+    if (!error || typeof error !== 'object') return null;
+    const maybeError = error as { context?: unknown };
+    return maybeError.context instanceof Response ? maybeError.context : null;
+  }
+
+  async function getAiErrorMessage(error: unknown): Promise<string> {
+    const response = getResponseContext(error);
+    if (response) {
+      try {
+        const body = await response.clone().json() as AiFunctionResponse;
+        if (body.error) return body.error;
+      } catch {
+        const text = await response.clone().text();
+        if (text) return text;
+      }
+    }
+
+    return error instanceof Error ? error.message : 'Неизвестная ошибка';
+  }
+
   function isAiSlideDraft(value: unknown): value is AiSlideDraft {
     if (!value || typeof value !== 'object') return false;
     const maybeSlide = value as Partial<AiSlideDraft>;
@@ -129,7 +150,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       },
     });
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(await getAiErrorMessage(error));
     if (data?.error) throw new Error(data.error);
     if (!data?.text) throw new Error('AI не вернул текст');
 
@@ -154,8 +175,9 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
     }, 950);
 
     createSlidesWithAi(slidesCountRef.current)
-      .catch(() => {
-        setAiNotice('Gemini пока недоступен, поэтому подготовили базовую структуру.');
+      .catch(async error => {
+        const message = await getAiErrorMessage(error);
+        setAiNotice(`Gemini пока недоступен, поэтому подготовили базовую структуру. Причина: ${message}`);
         return createSlides(slidesCountRef.current);
       })
       .then(generated => {
