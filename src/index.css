@@ -1608,6 +1608,90 @@ button.ghost {
 }
 .msg-actions button:hover { opacity: 1; background: var(--primary-mid); }
 
+.ai-schedule-card {
+  margin-top: 12px;
+  border: 1px solid var(--primary-mid);
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ai-schedule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-schedule-head span:last-child {
+  color: var(--soft);
+  font-weight: 700;
+}
+
+.ai-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ai-schedule-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-schedule-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.ai-schedule-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ai-schedule-meta {
+  color: var(--soft);
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.ai-schedule-add {
+  width: calc(100% - 20px);
+  margin: 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ai-schedule-add:hover {
+  background: var(--primary-dark);
+}
+
+.ai-schedule-add:disabled {
+  background: #16A34A;
+  opacity: 1;
+  cursor: default;
+}
+
 .typing-dots {
   display: flex;
   gap: 5px;
@@ -2549,6 +2633,9 @@ button.ghost {
 [data-theme="dark"] .chat-area { background: #0F172A; }
 [data-theme="dark"] .msg-bubble.ai { background: #1E293B; border-color: #334155; color: #F1F5F9; }
 [data-theme="dark"] .msg-bubble.user { background: #1E40AF; }
+[data-theme="dark"] .ai-schedule-card { background: #0F172A; border-color: #334155; }
+[data-theme="dark"] .ai-schedule-head,
+[data-theme="dark"] .ai-schedule-row { border-color: #334155; }
 [data-theme="dark"] .chat-input-wrap { background: #1E293B; border-color: #334155; }
 [data-theme="dark"] .chat-input { background: #1E293B; color: #F1F5F9; }
 [data-theme="dark"] .attach-btn { color: #94A3B8; }

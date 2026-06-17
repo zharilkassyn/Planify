@@ -1,9 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-type Message = { id: string; role: 'user' | 'ai'; content: string; time: string };
+type PlannerDraftEvent = {
+  title: string;
+  description: string;
+  hour: number;
+  end_hour: number;
+  event_date: string;
+  color: string;
+};
+type Message = {
+  id: string;
+  role: 'user' | 'ai';
+  content: string;
+  time: string;
+  schedule?: PlannerDraftEvent[];
+  addedToPlanner?: boolean;
+};
 type Chat    = { id: string; title: string; time: string; messages: Message[] };
 type AiFunctionResponse = { text?: string; error?: string };
+type AiScheduleResponse = { reply: string; events: PlannerDraftEvent[] };
 
 const CAPABILITIES = [
   { icon: '📷', color: '#2563EB', title: 'Конспекты из фото',   desc: 'Загрузи фото конспекта или учебника, и я сделаю структурированный конспект.' },
@@ -15,6 +31,8 @@ const CAPABILITIES = [
 ];
 
 const QUICK = ['Сделать конспект', 'Создать флеш-карты', 'Объяснить тему', 'Создать тест'];
+const SCHEDULE_WORDS = ['расписан', 'план на день', 'план на неделю', 'запланируй', 'добавь в планировщик'];
+const EVENT_COLORS = ['#2563EB', '#0284C7', '#6366F1', '#0D9488', '#F59E0B', '#EF4444'];
 
 function getTime() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -22,6 +40,19 @@ function getTime() {
 
 function uid() {
   return Math.random().toString(36).slice(2);
+}
+
+function toDateString(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function todayString() {
+  return toDateString(new Date());
+}
+
+function isScheduleRequest(text: string) {
+  const lower = text.toLowerCase();
+  return SCHEDULE_WORDS.some(word => lower.includes(word));
 }
 
 const STORAGE_KEY = 'planify_chats';
@@ -73,6 +104,69 @@ async function askAi(prompt: string): Promise<string> {
   if (!data?.text?.trim()) throw new Error('ИИ не вернул ответ');
 
   return data.text.trim();
+}
+
+function stripCodeFence(text: string) {
+  return text.replace(/```json|```/g, '').trim();
+}
+
+function isPlannerDraftEvent(value: unknown): value is PlannerDraftEvent {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as Partial<PlannerDraftEvent>;
+  return (
+    typeof event.title === 'string'
+    && typeof event.description === 'string'
+    && typeof event.event_date === 'string'
+    && typeof event.color === 'string'
+    && typeof event.hour === 'number'
+    && typeof event.end_hour === 'number'
+  );
+}
+
+function normalizeEvent(event: PlannerDraftEvent, index: number): PlannerDraftEvent {
+  const hour = Math.min(21, Math.max(8, Math.round(event.hour)));
+  const endHour = Math.min(22, Math.max(hour + 1, Math.round(event.end_hour)));
+  const color = EVENT_COLORS.includes(event.color) ? event.color : EVENT_COLORS[index % EVENT_COLORS.length];
+
+  return {
+    title: event.title.slice(0, 80),
+    description: event.description.slice(0, 180),
+    hour,
+    end_hour: endHour,
+    event_date: /^\d{4}-\d{2}-\d{2}$/.test(event.event_date) ? event.event_date : todayString(),
+    color,
+  };
+}
+
+function parseScheduleResponse(text: string): AiScheduleResponse {
+  const cleanText = stripCodeFence(text);
+  const start = cleanText.indexOf('{');
+  const end = cleanText.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) throw new Error('ИИ не вернул JSON для расписания');
+
+  const parsed = JSON.parse(cleanText.slice(start, end + 1)) as Partial<AiScheduleResponse>;
+  const events = Array.isArray(parsed.events)
+    ? parsed.events.filter(isPlannerDraftEvent).map(normalizeEvent)
+    : [];
+
+  if (!parsed.reply || events.length === 0) throw new Error('ИИ не смог составить расписание');
+  return { reply: parsed.reply, events };
+}
+
+async function askAiForSchedule(prompt: string): Promise<AiScheduleResponse> {
+  const today = todayString();
+  const response = await askAi([
+    `Запрос пользователя: ${prompt}`,
+    `Сегодня: ${today}`,
+    'Составь расписание для планировщика.',
+    'Если пользователь не указал дату, используй сегодняшнюю дату.',
+    'Рабочие часы планировщика: с 08:00 до 22:00.',
+    `Доступные цвета: ${EVENT_COLORS.join(', ')}.`,
+    'Верни только JSON без markdown.',
+    'Формат: {"reply":"короткое описание расписания","events":[{"title":"...","description":"...","hour":9,"end_hour":10,"event_date":"YYYY-MM-DD","color":"#2563EB"}]}',
+  ].join('\n'));
+
+  return parseScheduleResponse(response);
 }
 
 export function AIPage() {
@@ -128,8 +222,15 @@ export function AIPage() {
 
     setTyping(true);
     let aiContent = '';
+    let schedule: PlannerDraftEvent[] | undefined;
     try {
-      aiContent = await askAi(content);
+      if (isScheduleRequest(content)) {
+        const result = await askAiForSchedule(content);
+        aiContent = result.reply;
+        schedule = result.events;
+      } else {
+        aiContent = await askAi(content);
+      }
     } catch (error) {
       const message = await getAiErrorMessage(error);
       aiContent = `Не получилось получить ответ от ИИ.\n\nПроверь, что GEMINI_API_KEY добавлен в Supabase Secrets и функция ai задеплоена.\n\nДетали: ${message}`;
@@ -137,12 +238,49 @@ export function AIPage() {
       setTyping(false);
     }
 
-    const aiMsg: Message = { id: uid(), role: 'ai', content: aiContent, time: getTime() };
+    const aiMsg: Message = { id: uid(), role: 'ai', content: aiContent, time: getTime(), schedule };
     const final = updated.map(c =>
       c.id === chatId ? { ...c, messages: [...c.messages, aiMsg] } : c
     );
     setChats(final);
     saveChats(final);
+  }
+
+  async function addScheduleToPlanner(messageId: string, schedule: PlannerDraftEvent[]) {
+    if (!activeChatId || schedule.length === 0) return;
+
+    const { error } = await supabase.from('planner_events').insert(
+      schedule.map(event => ({
+        title: event.title,
+        description: event.description,
+        hour: event.hour,
+        end_hour: event.end_hour,
+        color: event.color,
+        event_date: event.event_date,
+      })),
+    );
+
+    const nextContent = error
+      ? `Не получилось добавить расписание в планировщик.\n\nДетали: ${error.message}`
+      : null;
+
+    const updated = chats.map(chat => {
+      if (chat.id !== activeChatId) return chat;
+      return {
+        ...chat,
+        messages: chat.messages.map(message => {
+          if (message.id !== messageId) return message;
+          return {
+            ...message,
+            content: nextContent ?? message.content,
+            addedToPlanner: !error,
+          };
+        }),
+      };
+    });
+
+    setChats(updated);
+    saveChats(updated);
   }
 
   function deleteChat(id: string) {
@@ -232,6 +370,34 @@ export function AIPage() {
               )}
               <div className={`msg-bubble ${m.role}`}>
                 <div className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                {m.schedule && m.schedule.length > 0 && (
+                  <div className="ai-schedule-card">
+                    <div className="ai-schedule-head">
+                      <span>Расписание</span>
+                      <span>{m.schedule.length} событий</span>
+                    </div>
+                    <div className="ai-schedule-list">
+                      {m.schedule.map((event, i) => (
+                        <div key={`${event.event_date}-${event.hour}-${event.title}-${i}`} className="ai-schedule-row">
+                          <div className="ai-schedule-dot" style={{ background: event.color }} />
+                          <div>
+                            <div className="ai-schedule-title">{event.title}</div>
+                            <div className="ai-schedule-meta">
+                              {event.event_date} · {String(event.hour).padStart(2, '0')}:00-{String(event.end_hour).padStart(2, '0')}:00
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      className="ai-schedule-add"
+                      onClick={() => addScheduleToPlanner(m.id, m.schedule ?? [])}
+                      disabled={m.addedToPlanner}
+                    >
+                      {m.addedToPlanner ? 'Добавлено в планировщик' : 'Добавить в планировщик'}
+                    </button>
+                  </div>
+                )}
                 <div className="msg-time">{m.time}</div>
                 {m.role === 'ai' && (
                   <div className="msg-actions">
