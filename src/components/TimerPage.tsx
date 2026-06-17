@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { requestPermission, notifyTimerDone } from '../lib/notifications';
 
 type Task = { id: string; title: string; completed: boolean };
 type Mode = 'focus' | 'short' | 'long';
@@ -104,21 +105,23 @@ export function TimerPage() {
         const left = totalSecRef.current - elapsed;
         if (left <= 0) {
           clearInterval(intervalRef.current!);
+          notifyTimerDone(mode);
+          const completedSec = totalSecRef.current ?? 0;
           setRunning(false);
           setTimeLeft(0);
           startedAtRef.current = undefined;
           totalSecRef.current  = undefined;
           if (mode === 'focus') {
             setCycles(c => c + 1);
-            setTodaySec(s => s + MODES.focus.duration);
+            setTodaySec(s => s + completedSec);
             const today = new Date().getDay();
             const idx = today === 0 ? 6 : today - 1;
-            setWeekData(w => { const n = [...w]; n[idx] += MODES.focus.duration / 3600; return n; });
+            setWeekData(w => { const n = [...w]; n[idx] += completedSec / 3600; return n; });
           }
           saveTimerState({ mode, running: false, pausedLeft: 0, customMins });
         } else {
           setTimeLeft(left);
-          if (mode === 'focus') setSessionSec(s => s + 1);
+          if (mode === 'focus') setSessionSec(elapsed);
         }
       }, 500); // 500ms for smoother update
     } else {
@@ -128,6 +131,7 @@ export function TimerPage() {
   }, [running, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startTimer() {
+    requestPermission();
     const total = customMins[mode] * 60;
     // If resuming from pause use current timeLeft, else full duration
     const remaining = timeLeft > 0 ? timeLeft : total;
