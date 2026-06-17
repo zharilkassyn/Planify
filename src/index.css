@@ -108,9 +108,6 @@ body { background: var(--bg); min-height: 100vh; }
   background: var(--primary);
   border-radius: 2px;
 }
-}
-  margin-top: -6px;
-}
 
 /* Collapsed logo: only shows the toggle button, centred */
 .sidebar-logo-collapsed {
@@ -926,7 +923,7 @@ button.ghost {
   border-radius: 14px;
   padding: 18px;
 }
-.quote-mark { font-size: 36px; color: var(--primary-mid); line-height: 1; margin-bottom: 4px; }
+.quote-mark { font-size: 36px; color: var(--primary); line-height: 1; margin-bottom: 4px; }
 .quote-card p { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
 .quote-card span { font-size: 12px; color: var(--soft); }
 
@@ -2014,6 +2011,18 @@ button.ghost {
   border-radius: 12px;
   padding: 14px 16px;
 }
+.fc-fav-btn {
+  background: none;
+  border: none;
+  padding: 4px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.fc-fav-btn:hover { background: #FEF3C7; }
 .fc-delete-btn {
   opacity: 0;
   background: none;
@@ -3041,4 +3050,518 @@ button.ghost {
   display: flex;
   align-items: center;
   gap: 28px;
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE BOTTOM NAV
+═══════════════════════════════════════════════════ */
+.bottom-nav {
+  display: none; /* hidden on desktop */
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE — TABLET (≤1024px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  /* Shrink sidebar to icon-only on tablet */
+  .sidebar {
+    width: 68px;
+  }
+  .sidebar-logo {
+    justify-content: center;
+    padding: 0 0 20px;
+  }
+  .sidebar-logo-text,
+  .sidebar-toggle-btn {
+    display: none;
+  }
+  .sidebar-nav {
+    padding: 20px 10px;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 11px 0;
+  }
+  .nav-label {
+    display: none;
+  }
+  .sidebar-bottom {
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .user-name,
+  .user-role,
+  .signout-btn {
+    display: none;
+  }
+  .main-content {
+    margin-left: 68px;
+  }
+
+  /* Planner & Progress: stack panels */
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+  .progress-layout {
+    grid-template-columns: 1fr;
+  }
+  .timer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* Session stats on timer: 2 col */
+  .session-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Progress stat cards: 2 col */
+  .prog-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* AI layout: hide right panel */
+  .ai-layout {
+    grid-template-columns: 1fr;
+  }
+  .ai-right {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤768px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ── Hide desktop sidebar entirely ── */
+  .sidebar {
+    display: none !important;
+  }
+
+  /* ── Main content: full width, bottom padding for nav bar ── */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 16px 16px 84px;
+    min-height: 100vh;
+  }
+
+  /* ── Show bottom nav ── */
+  .bottom-nav {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+    /* Safe area for notched phones */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav-inner {
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* Equal distribution across visible width */
+    width: 100%;
+  }
+  .bottom-nav-inner::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    min-width: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px 10px;
+    border: none;
+    background: none;
+    color: var(--soft);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: inherit;
+    transition: color 0.15s, background 0.15s;
+    min-height: 56px;
+    border-radius: 0;
+  }
+  .bottom-nav-item:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  .bottom-nav-item.active {
+    color: var(--primary);
+  }
+  .bottom-nav-item.active svg {
+    stroke: var(--primary);
+  }
+  /* Accent dot indicator under active item */
+  .bottom-nav-item.active::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .bottom-nav-item {
+    position: relative;
+  }
+
+  .bottom-nav-label {
+    font-size: 10px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 56px;
+  }
+
+  .bottom-nav-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* ── App layout on mobile ── */
+  .app-layout {
+    display: block;
+  }
+
+  /* ── Dashboard header ── */
+  .dash-header {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .dash-greeting h2 {
+    font-size: 20px;
+  }
+
+  /* ── Widgets row: single column ── */
+  .widgets-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* ── Bottom row: single column ── */
+  .bottom-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* ── Quick actions: 2×2 grid stays, no change needed ── */
+
+  /* ── Planner ── */
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+  .planner-controls {
+    gap: 8px;
+  }
+  .view-tabs {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .view-tab {
+    flex: 1;
+    padding: 7px 8px;
+    font-size: 13px;
+  }
+  .date-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .date-chip {
+    flex: 1;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .planner-input {
+    width: 100%;
+  }
+  /* Month grid: smaller cells */
+  .month-cell {
+    min-height: 52px;
+    padding: 4px;
+  }
+  .month-day-num {
+    font-size: 12px;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* ── Timer page ── */
+  .timer-layout {
+    grid-template-columns: 1fr;
+  }
+  .session-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .timer-circle-wrap {
+    padding: 20px 16px 16px;
+  }
+
+  /* ── Progress page ── */
+  .progress-layout {
+    grid-template-columns: 1fr;
+  }
+  .prog-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .prog-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* ── Flash cards ── */
+  .fc-body {
+    flex-direction: column;
+  }
+  .fc-right {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .fc-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .fc-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .fc-header > div:first-child {
+    flex: unset;
+  }
+  .flip-card-face {
+    padding: 24px 20px;
+  }
+  .flip-text {
+    font-size: 18px;
+  }
+
+  /* ── Notes page ── */
+  .notes-layout {
+    flex-direction: column;
+    margin: -16px;
+    height: auto;
+    overflow: visible;
+  }
+  .notes-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #E2E8F0;
+    padding: 12px;
+    gap: 12px;
+  }
+  .notes-list-panel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #E2E8F0;
+    max-height: 320px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .notes-editor-panel {
+    flex: 1;
+    min-height: 400px;
+    padding: 16px;
+  }
+
+  /* ── AI page ── */
+  .ai-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .ai-right {
+    display: none;
+  }
+  .ai-main {
+    height: calc(100vh - 140px);
+  }
+
+  /* ── Modal ── */
+  .modal-card {
+    margin: 0 16px;
+    padding: 20px;
+  }
+
+  /* ── Touch targets: ensure 44px min height on interactive elements ── */
+  .nav-arrow,
+  .view-tab,
+  .timer-tab,
+  .fc-tab,
+  .add-task-btn,
+  .fc-btn-primary,
+  .fc-btn-secondary,
+  .fc-back-btn {
+    min-height: 44px;
+  }
+
+  /* ── Landing page nav ── */
+  .land-nav {
+    padding: 0 16px;
+    height: 56px;
+  }
+  .land-nav-links {
+    display: none;
+  }
+  .land-nav-right {
+    gap: 12px;
+  }
+  .land-btn-login {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  /* ── Landing hero: stack vertically ── */
+  .land-hero {
+    flex-direction: column;
+    padding: 32px 16px 40px;
+    gap: 32px;
+  }
+  .land-hero-left {
+    order: 1;
+  }
+  .land-hero-right {
+    order: 2;
+    padding: 0;
+    /* Hide on very small screens */
+    display: none;
+  }
+  .land-headline {
+    font-size: 32px;
+    letter-spacing: -0.5px;
+  }
+  .land-desc {
+    font-size: 15px;
+  }
+  .land-btn-primary,
+  .land-btn-ghost {
+    padding: 12px 20px;
+    font-size: 15px;
+    min-height: 48px;
+  }
+  .land-cta-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .land-trust {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE — SMALL MOBILE (≤480px)
+═══════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 12px 12px 80px;
+  }
+
+  /* Widget padding */
+  .widget {
+    padding: 16px;
+  }
+  .panel {
+    padding: 14px;
+  }
+
+  /* Progress stats: single column on very small screens */
+  .prog-stats-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Session stats */
+  .session-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Timer big time font */
+  .timer-big-time {
+    font-size: 40px;
+  }
+
+  /* Flash card face padding */
+  .flip-card-face {
+    padding: 20px 16px;
+  }
+  .flip-text {
+    font-size: 16px;
+  }
+
+  /* Bottom nav labels: hide on tiny screens */
+  .bottom-nav-label {
+    display: none;
+  }
+  .bottom-nav-item {
+    min-height: 50px;
+  }
+
+  /* Add task form */
+  .add-task-form {
+    flex-direction: column;
+  }
+  .add-task-form button {
+    width: 100%;
+  }
+
+  /* Landing */
+  .land-headline {
+    font-size: 26px;
+  }
+  .land-badge {
+    font-size: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   DARK THEME — MOBILE BOTTOM NAV
+═══════════════════════════════════════════════════ */
+[data-theme="dark"] .bottom-nav {
+  background: #1E293B;
+  border-top-color: #334155;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+[data-theme="dark"] .bottom-nav-item {
+  color: #64748B;
+}
+[data-theme="dark"] .bottom-nav-item:hover {
+  background: #263348;
+  color: #F1F5F9;
+}
+[data-theme="dark"] .bottom-nav-item.active {
+  color: #93C5FD;
+}
+[data-theme="dark"] .bottom-nav-item.active svg {
+  stroke: #93C5FD;
+}
+[data-theme="dark"] .bottom-nav-item.active::after {
+  background: #93C5FD;
 }

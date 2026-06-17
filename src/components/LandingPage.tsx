@@ -5,7 +5,12 @@ export function LandingPage() {
   const [showAuth, setShowAuth] = useState(false);
 
   return (
-    <div className="land-root">
+    <div className="land-root" style={{
+      '--primary':       '#2563EB',
+      '--primary-light': '#EFF6FF',
+      '--primary-mid':   '#BFDBFE',
+      '--primary-dark':  '#1D4ED8',
+    } as React.CSSProperties}>
       {/* Auth modal */}
       {showAuth && (
         <div className="modal-overlay" onClick={() => setShowAuth(false)}>

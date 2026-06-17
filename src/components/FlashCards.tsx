@@ -20,6 +20,45 @@ export function FlashCards() {
   const [totalReviews, setTotalReviews] = useState(0);
   const [correctReviews, setCorrectReviews] = useState(0);
 
+  const [trashedIds, setTrashedIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('planify_trash_decks') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  function saveTrashed(next: Set<string>) {
+    localStorage.setItem('planify_trash_decks', JSON.stringify([...next]));
+  }
+
+  function trashDeck(id: string) {
+    setTrashedIds(prev => { const n = new Set(prev); n.add(id); saveTrashed(n); return n; });
+  }
+
+  function restoreDeck(id: string) {
+    setTrashedIds(prev => { const n = new Set(prev); n.delete(id); saveTrashed(n); return n; });
+  }
+
+  async function permanentDeleteDeck(id: string) {
+    if (!confirm('Удалить колоду навсегда? Это действие нельзя отменить.')) return;
+    await supabase.from('flashcards').delete().eq('deck_id', id);
+    await supabase.from('flashcard_decks').delete().eq('id', id);
+    setDecks(prev => prev.filter(d => d.id !== id));
+    setTrashedIds(prev => { const n = new Set(prev); n.delete(id); saveTrashed(n); return n; });
+  }
+
+  const [favDeckIds, setFavDeckIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('planify_fav_decks') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  function toggleFavDeck(id: string) {
+    setFavDeckIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem('planify_fav_decks', JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   const [showNewDeck, setShowNewDeck] = useState(false);
   const [showNewCard, setShowNewCard] = useState(false);
   const [deckName, setDeckName] = useState('');
@@ -85,11 +124,9 @@ export function FlashCards() {
     }
   }
 
-  async function deleteDeck(id: string) {
-    if (!confirm('Удалить колоду и все её карточки?')) return;
-    await supabase.from('flashcards').delete().eq('deck_id', id);
-    await supabase.from('flashcard_decks').delete().eq('id', id);
-    setDecks(prev => prev.filter(d => d.id !== id));
+  function deleteDeck(id: string) {
+    trashDeck(id);
+    if (selectedDeck?.id === id) setSelectedDeck(null);
   }
 
   async function saveCard() {
@@ -134,7 +171,9 @@ export function FlashCards() {
     setCardIdx(0); setFlipped(false);
   }
 
-  const totalCards = decks.reduce((s, d) => s + (d.card_count ?? 0), 0);
+  const activeDecks = decks.filter(d => !trashedIds.has(d.id));
+  const trashedDecks = decks.filter(d => trashedIds.has(d.id));
+  const totalCards = activeDecks.reduce((s, d) => s + (d.card_count ?? 0), 0);
   const accuracy = totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0;
 
   /* ── Study session ──────────────────────────────────────────────────────── */
@@ -329,14 +368,7 @@ export function FlashCards() {
           <p style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>Эффективное запоминание с помощью карточек</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="fc-btn-secondary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Импорт
-          </button>
-          <button className="fc-btn-primary" onClick={() => setShowNewDeck(true)}>
+<button className="fc-btn-primary" onClick={() => setShowNewDeck(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -424,7 +456,7 @@ export function FlashCards() {
           {tab === 'overview' && (
             loading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Загрузка...</div>
-            ) : decks.length === 0 ? (
+            ) : activeDecks.length === 0 ? (
               <div className="fc-empty">
                 <div className="fc-empty-icon" style={{ background: '#EFF6FF' }}>
                   <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5">
@@ -441,7 +473,7 @@ export function FlashCards() {
               <>
                 <div style={{ fontWeight: 600, fontSize: 15, color: '#1E293B' }}>Недавние колоды</div>
                 <div className="fc-decks-grid">
-                  {decks.slice(0, 6).map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck}/>)}
+                  {activeDecks.slice(0, 6).map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck} isFav={favDeckIds.has(deck.id)} onToggleFav={toggleFavDeck}/>)}
                 </div>
               </>
             )
@@ -451,7 +483,7 @@ export function FlashCards() {
           {tab === 'decks' && (
             loading ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Загрузка...</div>
-            ) : decks.length === 0 ? (
+            ) : activeDecks.length === 0 ? (
               <div className="fc-empty">
                 <div className="fc-empty-icon" style={{ background: '#EFF6FF' }}>
                   <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5">
@@ -465,7 +497,7 @@ export function FlashCards() {
               </div>
             ) : (
               <div className="fc-decks-grid">
-                {decks.map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck}/>)}
+                {activeDecks.map(deck => <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck} isFav={favDeckIds.has(deck.id)} onToggleFav={toggleFavDeck}/>)}
                 <div className="fc-deck-card fc-deck-new" onClick={() => setShowNewDeck(true)}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -478,30 +510,76 @@ export function FlashCards() {
 
           {/* Tab: Избранное */}
           {tab === 'favorites' && (
-            <div className="fc-empty">
-              <div className="fc-empty-icon" style={{ background: '#FFF7ED' }}>
-                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.5">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
+            loading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#94A3B8' }}>Загрузка...</div>
+            ) : activeDecks.filter(d => favDeckIds.has(d.id)).length === 0 ? (
+              <div className="fc-empty">
+                <div className="fc-empty-icon" style={{ background: '#FFF7ED' }}>
+                  <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1.5">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div className="fc-empty-title">Избранных колод нет</div>
+                <div className="fc-empty-sub">Нажми на звёздочку на колоде, чтобы добавить в избранное</div>
               </div>
-              <div className="fc-empty-title">Избранных карточек нет</div>
-              <div className="fc-empty-sub">Отмечай карточки звёздочкой во время изучения</div>
-            </div>
+            ) : (
+              <div className="fc-decks-grid">
+                {activeDecks.filter(d => favDeckIds.has(d.id)).map(deck => (
+                  <DeckCard key={deck.id} deck={deck} onOpen={openDeck} onStudy={startStudy} onDelete={deleteDeck} isFav={true} onToggleFav={toggleFavDeck}/>
+                ))}
+              </div>
+            )
           )}
 
           {/* Tab: Корзина */}
           {tab === 'trash' && (
-            <div className="fc-empty">
-              <div className="fc-empty-icon" style={{ background: '#F1F5F9' }}>
-                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
-                  <path d="M9 6V4h6v2"/>
-                </svg>
+            trashedDecks.length === 0 ? (
+              <div className="fc-empty">
+                <div className="fc-empty-icon" style={{ background: '#F1F5F9' }}>
+                  <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                  </svg>
+                </div>
+                <div className="fc-empty-title">Корзина пуста</div>
+                <div className="fc-empty-sub">Удалённые колоды появятся здесь</div>
               </div>
-              <div className="fc-empty-title">Корзина пуста</div>
-              <div className="fc-empty-sub">Удалённые колоды и карточки появятся здесь</div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {trashedDecks.map(deck => (
+                  <div key={deck.id} style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--card)', border: '1px solid #E2E8F0', borderRadius: 14, padding: '14px 18px' }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: deck.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                        <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M8 7V5a2 2 0 00-4 0v2"/>
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deck.name}</div>
+                      <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>{deck.card_count} карточек</div>
+                    </div>
+                    <button
+                      onClick={() => restoreDeck(deck.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'var(--card)', color: '#1E293B', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                      </svg>
+                      Восстановить
+                    </button>
+                    <button
+                      onClick={() => permanentDeleteDeck(deck.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#EF4444', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                      </svg>
+                      Удалить навсегда
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
 
@@ -510,18 +588,18 @@ export function FlashCards() {
           <div className="panel" style={{ padding: 18 }}>
             <div className="panel-header" style={{ marginBottom: 14 }}>
               <span className="panel-title">Мои колоды</span>
-              {decks.length > 0 && (
+              {activeDecks.length > 0 && (
                 <span style={{ fontSize: 12, color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
                   onClick={() => setTab('decks')}>Все</span>
               )}
             </div>
-            {decks.length === 0 ? (
+            {activeDecks.length === 0 ? (
               <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>
                 Колод ещё нет
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {decks.slice(0, 6).map(deck => (
+                {activeDecks.slice(0, 6).map(deck => (
                   <div key={deck.id} className="fc-deck-row" onClick={() => openDeck(deck)}>
                     <div className="fc-deck-dot" style={{ background: deck.color }}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -595,7 +673,7 @@ export function FlashCards() {
   );
 }
 
-function DeckCard({ deck, onOpen, onStudy, onDelete }: { deck: Deck; onOpen: (d: Deck) => void; onStudy: (d: Deck) => void; onDelete: (id: string) => void }) {
+function DeckCard({ deck, onOpen, onStudy, onDelete, isFav, onToggleFav }: { deck: Deck; onOpen: (d: Deck) => void; onStudy: (d: Deck) => void; onDelete: (id: string) => void; isFav: boolean; onToggleFav: (id: string) => void }) {
   return (
     <div className="fc-deck-card" onClick={() => onOpen(deck)}>
       <div className="fc-deck-top" style={{ background: deck.color + '20' }}>
@@ -604,8 +682,19 @@ function DeckCard({ deck, onOpen, onStudy, onDelete }: { deck: Deck; onOpen: (d:
             <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M8 7V5a2 2 0 00-4 0v2"/>
           </svg>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div className="fc-deck-count">{deck.card_count} карт.</div>
+          <button
+            className="fc-fav-btn"
+            onClick={e => { e.stopPropagation(); onToggleFav(deck.id); }}
+            title={isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24"
+              fill={isFav ? '#F59E0B' : 'none'}
+              stroke={isFav ? '#F59E0B' : '#94A3B8'} strokeWidth="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
           <button className="fc-delete-btn fc-deck-delete" onClick={e => { e.stopPropagation(); onDelete(deck.id); }} title="Удалить колоду">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="3 6 5 6 21 6"/>

@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from 'react';
 const TIMER_KEY = 'planify_timer_state';
 
 const MODE_COLORS: Record<string, string> = {
-  focus: '#2563EB',
   short: '#0D9488',
   long:  '#6366F1',
 };
@@ -22,6 +21,9 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
   const [startedAt,  setStartedAt]  = useState<number | null>(null);
   const [pos,        setPos]        = useState({ x: window.innerWidth - 240, y: 18 });
   const [wSize,      setWSize]      = useState(210);
+  const [themeColor, setThemeColor] = useState(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB'
+  );
 
   const dragging        = useRef(false);
   const dragOffset      = useRef({ x: 0, y: 0 });
@@ -32,6 +34,14 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
   // widget only re-appears when a NEW startedAt is detected
   const hiddenAtStartedAt = useRef<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setThemeColor(getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB');
+    });
+    obs.observe(document.documentElement, { attributes: true });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -83,7 +93,7 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
 
   if (!running || hidden) return null;
 
-  const color = MODE_COLORS[mode] || '#2563EB';
+  const color = mode === 'focus' ? themeColor : (MODE_COLORS[mode] || themeColor);
   const label = MODE_LABELS[mode] || 'Фокус';
   const mins  = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const secs  = String(timeLeft % 60).padStart(2, '0');

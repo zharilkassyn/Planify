@@ -114,8 +114,8 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
           <div className="widget-title">Таймер фокусировки</div>
           <div className="timer-circle">
             <svg width="130" height="130" viewBox="0 0 130 130">
-              <circle cx="65" cy="65" r={r} fill="none" stroke="#DBEAFE" strokeWidth="8"/>
-              <circle cx="65" cy="65" r={r} fill="none" stroke="#2563EB" strokeWidth="8"
+              <circle cx="65" cy="65" r={r} fill="none" stroke="var(--primary)" strokeOpacity="0.15" strokeWidth="8"/>
+              <circle cx="65" cy="65" r={r} fill="none" stroke="var(--primary)" strokeWidth="8"
                 strokeDasharray={`${circ * progress} ${circ}`}
                 strokeLinecap="round"
                 transform="rotate(-90 65 65)"
@@ -149,8 +149,8 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
           <div className="progress-circle-wrap">
             <div className="progress-circle">
               <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r={rp} fill="none" stroke="#DBEAFE" strokeWidth="9"/>
-                <circle cx="50" cy="50" r={rp} fill="none" stroke="#2563EB" strokeWidth="9"
+                <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeOpacity="0.15" strokeWidth="9"/>
+                <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeWidth="9"
                   strokeDasharray={`${cp * pct / 100} ${cp}`}
                   strokeLinecap="round"
                   transform="rotate(-90 50 50)"
@@ -210,10 +210,10 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
           <div className="widget-title">Быстрые действия</div>
           <div className="quick-actions">
             {[
-              { name: 'Планировщик', desc: 'Планируй задачи', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
-              { name: 'Таймер', desc: 'Фокус 25 минут', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/></svg> },
-              { name: 'Заметки', desc: 'Твои конспекты', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
-              { name: 'Прогресс', desc: 'Смотри статистику', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+              { name: 'Планировщик', desc: 'Планируй задачи', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
+              { name: 'Таймер', desc: 'Фокус 25 минут', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/></svg> },
+              { name: 'Заметки', desc: 'Твои конспекты', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
+              { name: 'Прогресс', desc: 'Смотри статистику', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
             ].map(a => (
               <button key={a.name} className="action-card" onClick={() => onNavigate(a.name)}>
                 <div className="action-icon">{a.icon}</div>
