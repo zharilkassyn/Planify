@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { addTodayFocusSeconds } from '../lib/timerStats';
 
 const TIMER_KEY = 'planify_timer_state';
 
@@ -52,7 +53,12 @@ export function FloatingTimer({ onNavigate }: { onNavigate: (page: string) => vo
         if (!s.running || !s.startedAt || !s.totalSec) { setRunning(false); return; }
         const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
         const left = s.totalSec - elapsed;
-        if (left <= 0) { setRunning(false); return; }
+        if (left <= 0) {
+          if ((s.mode ?? 'focus') === 'focus') addTodayFocusSeconds(s.totalSec);
+          localStorage.setItem(TIMER_KEY, JSON.stringify({ ...s, running: false, pausedLeft: 0 }));
+          setRunning(false);
+          return;
+        }
 
         setRunning(true);
         setMode(s.mode ?? 'focus');

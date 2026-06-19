@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { formatSecondsHMS, getTodayFocusSeconds, getWeekFocusHours, TIMER_STATS_EVENT } from '../lib/timerStats';
 
 type Entry = { id: string; title: string; completed: boolean; created_at: string };
+
+const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 export function Entries({ userEmail, onNavigate }: { userEmail: string; onNavigate: (page: string) => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -9,6 +12,8 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
   const [newTitle, setNewTitle] = useState('');
   const [modalError, setModalError] = useState('');
   const [timeLeft] = useState(25 * 60);
+  const [todayFocusSec, setTodayFocusSec] = useState(() => getTodayFocusSeconds());
+  const [weekData, setWeekData] = useState(() => getWeekFocusHours());
 
   async function load() {
     const { data } = await supabase
@@ -19,6 +24,19 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    const updateFocusTime = () => {
+      setTodayFocusSec(getTodayFocusSeconds());
+      setWeekData(getWeekFocusHours());
+    };
+    window.addEventListener(TIMER_STATS_EVENT, updateFocusTime);
+    window.addEventListener('storage', updateFocusTime);
+    return () => {
+      window.removeEventListener(TIMER_STATS_EVENT, updateFocusTime);
+      window.removeEventListener('storage', updateFocusTime);
+    };
+  }, []);
 
   async function add() {
     const text = newTitle.trim();
@@ -56,6 +74,15 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
   const pct = entries.length > 0 ? Math.round((done / entries.length) * 100) : 0;
   const rp = 40;
   const cp = 2 * Math.PI * rp;
+  const chartH = 96;
+  const chartW = 320;
+  const weekFocusHours = weekData.reduce((sum, hours) => sum + hours, 0);
+  const maxWeekHours = Math.max(...weekData, 0.5);
+  const chartPoints = weekData.map((hours, index) => {
+    const x = (index / 6) * (chartW - 28) + 18;
+    const y = chartH - (hours / maxWeekHours) * (chartH - 18) - 8;
+    return `${x},${y}`;
+  }).join(' ');
 
   const firstName = userEmail.split(' ')[0];
 
@@ -121,28 +148,64 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
           <div className="timer-start">Открыть таймер →</div>
         </div>
 
-        {/* Progress */}
+        {/* Statistics */}
         <div className="widget progress-wide-widget">
-          <div className="widget-title">Прогресс</div>
-          <div className="progress-circle-wrap">
-            <div className="progress-circle">
-              <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeOpacity="0.15" strokeWidth="9"/>
-                <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeWidth="9"
-                  strokeDasharray={`${cp * pct / 100} ${cp}`}
-                  strokeLinecap="round"
-                  transform="rotate(-90 50 50)"
-                />
-              </svg>
-              <div className="progress-text">
-                <span className="progress-pct">{pct}%</span>
-                <span className="progress-label">Готово</span>
+          <div className="dashboard-stats-head">
+            <div className="widget-title">Статистика</div>
+            <div className="dashboard-stats-head-gap" />
+            <div className="dashboard-chart-head">
+              <span>Фокус за неделю</span>
+              {weekFocusHours > 0 && <strong>{weekFocusHours.toFixed(1)}ч</strong>}
+            </div>
+          </div>
+          <div className="dashboard-stats-split">
+            <div className="dashboard-stats-left">
+              <div className="dashboard-task-summary">
+                <div className="progress-circle">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeOpacity="0.15" strokeWidth="9"/>
+                    <circle cx="50" cy="50" r={rp} fill="none" stroke="var(--primary)" strokeWidth="9"
+                      strokeDasharray={`${cp * pct / 100} ${cp}`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 50 50)"
+                    />
+                  </svg>
+                  <div className="progress-text">
+                    <span className="progress-pct">{pct}%</span>
+                    <span className="progress-label">Готово</span>
+                  </div>
+                </div>
+                <div className="progress-stats">
+                  <div className="stat-row"><span className="stat-key">Всего задач</span><span className="stat-val">{entries.length}</span></div>
+                  <div className="stat-row"><span className="stat-key">Выполнено</span><span className="stat-val">{done}</span></div>
+                  <div className="stat-row"><span className="stat-key">Осталось</span><span className="stat-val">{entries.length - done}</span></div>
+                </div>
+              </div>
+              <div className="dashboard-time-stat">
+                <div className="dashboard-time-value">{formatSecondsHMS(todayFocusSec)}</div>
+                <div className="dashboard-time-label">Потрачено сегодня</div>
               </div>
             </div>
-            <div className="progress-stats">
-              <div className="stat-row"><span className="stat-key">Всего задач</span><span className="stat-val">{entries.length}</span></div>
-              <div className="stat-row"><span className="stat-key">Выполнено</span><span className="stat-val">{done}</span></div>
-              <div className="stat-row"><span className="stat-key">Осталось</span><span className="stat-val">{entries.length - done}</span></div>
+            <div className="dashboard-stats-divider" />
+            <div className="dashboard-stats-chart">
+              <div className="dashboard-mini-chart">
+                <svg width="100%" height={chartH + 26} viewBox={`0 0 ${chartW} ${chartH + 26}`}>
+                  {[0, 0.5, 1].map(step => {
+                    const y = chartH - step * (chartH - 18) - 8;
+                    return <line key={step} x1="18" y1={y} x2={chartW - 10} y2={y} stroke="#E2E8F0" strokeWidth="1"/>;
+                  })}
+                  <polyline points={chartPoints} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round"/>
+                  {weekData.map((hours, index) => {
+                    const x = (index / 6) * (chartW - 28) + 18;
+                    const y = chartH - (hours / maxWeekHours) * (chartH - 18) - 8;
+                    return <circle key={DAY_LABELS[index]} cx={x} cy={y} r="4" fill="var(--primary)"/>;
+                  })}
+                  {DAY_LABELS.map((day, index) => {
+                    const x = (index / 6) * (chartW - 28) + 18;
+                    return <text key={day} x={x} y={chartH + 18} fontSize="10" fill="#94A3B8" textAnchor="middle">{day}</text>;
+                  })}
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -191,7 +254,6 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
               { name: 'Планировщик', desc: 'Планируй задачи', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
               { name: 'Таймер', desc: 'Фокус 25 минут', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/></svg> },
               { name: 'Заметки', desc: 'Твои конспекты', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
-              { name: 'Прогресс', desc: 'Смотри статистику', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
             ].map(a => (
               <button key={a.name} className="action-card" onClick={() => onNavigate(a.name)}>
                 <div className="action-icon">{a.icon}</div>

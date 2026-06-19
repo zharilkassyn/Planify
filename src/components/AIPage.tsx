@@ -14,7 +14,6 @@ type AppSection =
   | 'Главная'
   | 'Планировщик'
   | 'Таймер'
-  | 'Прогресс'
   | 'ИИ-помощник'
   | 'Флеш-карты'
   | 'Заметки'
@@ -738,6 +737,17 @@ export function AIPage({ onNavigate }: AIPageProps) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   }
 
+  function insertQuickPrompt(text: string) {
+    setInput(current => current.trim() ? `${current.trimEnd()} ${text}` : text);
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      const end = textarea.value.length;
+      textarea.setSelectionRange(end, end);
+    });
+  }
+
   return (
     <div className="ai-layout">
 
@@ -783,8 +793,15 @@ export function AIPage({ onNavigate }: AIPageProps) {
                 </svg>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{c.title}</span>
                 <span style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0 }}>{c.time}</span>
-                <button onClick={e => { e.stopPropagation(); deleteChat(c.id); }}
-                  style={{ background: 'none', border: 'none', color: '#CBD5E1', cursor: 'pointer', fontSize: 16, padding: '0 2px' }}>×</button>
+                <button className="recent-chat-delete" onClick={e => { e.stopPropagation(); deleteChat(c.id); }} aria-label="Удалить чат">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/>
+                    <path d="M10 11v6"/>
+                    <path d="M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                  </svg>
+                </button>
               </div>
             ))}
           </div>
@@ -800,7 +817,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
                 <div className="ai-welcome-sub">Я здесь, чтобы помочь тебе учиться эффективнее.<br/>Что хочешь сделать сегодня?</div>
                 <div className="ai-quick-btns">
                   {QUICK.map(q => (
-                    <button key={q} className="quick-btn" onClick={() => send(q)}>{q}</button>
+                    <button key={q} className="quick-btn" onClick={() => insertQuickPrompt(q)}>{q}</button>
                   ))}
                 </div>
               </div>
@@ -880,7 +897,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
             }}
           />
           <button className="attach-btn" title="Прикрепить файл" type="button" onClick={() => fileInputRef.current?.click()}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
             </svg>
           </button>
@@ -894,7 +911,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
             onKeyDown={handleKey}
           />
           <button className="send-btn" onClick={() => send()} disabled={!input.trim() && !attachment}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="send-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
@@ -923,7 +940,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
         </div>
 
         {/* Recent chats */}
-        <div className="panel" style={{ padding: 18 }}>
+        <div className="panel ai-recent-panel">
           <div className="panel-header" style={{ marginBottom: 12 }}>
             <span className="panel-title">Недавние чаты</span>
             {chats.length > 0 && (
@@ -936,8 +953,8 @@ export function AIPage({ onNavigate }: AIPageProps) {
               Начни первый чат — здесь появится история
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {chats.slice(0, 5).map(c => (
+            <div className="recent-chat-list">
+              {chats.map(c => (
                 <div key={c.id} className={`recent-chat-item${c.id === activeChatId ? ' active' : ''}`}
                   onClick={() => setActiveChat(c.id)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -946,20 +963,19 @@ export function AIPage({ onNavigate }: AIPageProps) {
                   </svg>
                   <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
                   <span style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0 }}>{c.time}</span>
+                  <button className="recent-chat-delete" onClick={e => { e.stopPropagation(); deleteChat(c.id); }} aria-label="Удалить чат">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14H6L5 6"/>
+                      <path d="M10 11v6"/>
+                      <path d="M14 11v6"/>
+                      <path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* Upload */}
-        <div className="upload-card" onClick={() => fileInputRef.current?.click()}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
-            <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
-            <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>
-          </svg>
-          <div style={{ fontWeight: 600, fontSize: 14, marginTop: 8 }}>Загрузи фото для анализа</div>
-          <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>Перетащи файл сюда или нажми для выбора</div>
         </div>
 
       </div>

@@ -1,13 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
 
-const BlockBlastGame = lazy(() => import('./BlockBlastGame').then(module => ({ default: module.BlockBlastGame })));
 const ChessGame = lazy(() => import('./ChessGame').then(module => ({ default: module.ChessGame })));
-const FillCupGame = lazy(() => import('./FillCupGame').then(module => ({ default: module.FillCupGame })));
 const Game2048 = lazy(() => import('./Game2048').then(module => ({ default: module.Game2048 })));
 const SudokuGame = lazy(() => import('./SudokuGame').then(module => ({ default: module.SudokuGame })));
 const Tennis3DGame = lazy(() => import('./Tennis3DGame').then(module => ({ default: module.Tennis3DGame })));
 
-type GameId = 'block-blast' | 'sudoku' | 'chess' | 'cup' | '2048' | 'tennis';
+type GameId = 'sudoku' | 'chess' | '2048' | 'tennis';
 
 type GameCard = {
   id: GameId;
@@ -19,12 +17,6 @@ type GameCard = {
 
 const games: GameCard[] = [
   {
-    id: 'block-blast',
-    title: 'Block Blast ⭐',
-    desc: 'Расслабься и очисти поле',
-    featured: true,
-  },
-  {
     id: 'sudoku',
     title: 'Судоку',
     desc: 'Классическая игра для тренировки логики',
@@ -33,11 +25,6 @@ const games: GameCard[] = [
     id: 'chess',
     title: 'Шахматы с ИИ',
     desc: 'Играй с ИИ разных уровней',
-  },
-  {
-    id: 'cup',
-    title: 'Наполни стакан 💧',
-    desc: 'Нарисуй путь и заполни стакан водой',
   },
   {
     id: '2048',
@@ -52,21 +39,6 @@ const games: GameCard[] = [
 ];
 
 function GamePreview({ id }: { id: GameId }) {
-  if (id === 'block-blast') {
-    return (
-      <div className="game-preview-scene block-preview">
-        <div className="block-board">
-          {Array.from({ length: 25 }).map((_, index) => <span key={index} />)}
-        </div>
-        <div className="block-shapes">
-          <i className="shape shape-l"><b/><b/><b/><b/></i>
-          <i className="shape shape-line"><b/><b/><b/></i>
-          <i className="shape shape-square"><b/><b/><b/><b/></i>
-        </div>
-      </div>
-    );
-  }
-
   if (id === 'sudoku') {
     const cells = ['5', '', '8', '', '', '7', '', '2', '', '', '9', '', '4', '', '', '', '6', '', '8', '', '', '', '3', '', '', '1', ''];
     return (
@@ -81,18 +53,6 @@ function GamePreview({ id }: { id: GameId }) {
     return (
       <div className="game-preview-scene chess-preview">
         {pieces.map((piece, index) => <span key={index}>{piece}</span>)}
-      </div>
-    );
-  }
-
-  if (id === 'cup') {
-    return (
-      <div className="game-preview-scene cup-preview">
-        <span className="water-drop" />
-        <span className="water-path" />
-        <div className="cup-glass">
-          <i />
-        </div>
       </div>
     );
   }
@@ -124,9 +84,7 @@ export function GamesPage() {
 
   function renderActiveGame() {
     if (activeGame === 'sudoku') return <SudokuGame onBack={backToGames} />;
-    if (activeGame === 'block-blast') return <BlockBlastGame onBack={backToGames} />;
     if (activeGame === 'chess') return <ChessGame onBack={backToGames} />;
-    if (activeGame === 'cup') return <FillCupGame onBack={backToGames} />;
     if (activeGame === '2048') return <Game2048 onBack={backToGames} />;
     if (activeGame === 'tennis') return <Tennis3DGame onBack={backToGames} />;
     return null;

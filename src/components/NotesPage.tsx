@@ -55,8 +55,6 @@ export function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [folderId, setFolderId] = useState<string | 'all' | 'starred'>('all');
   const [selected, setSelected] = useState<Note | null>(null);
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -66,6 +64,7 @@ export function NotesPage() {
   const [editStarred, setEditStarred] = useState(false);
 
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderColor, setFolderColor] = useState(FOLDER_COLORS[0]);
   const [tagInput, setTagInput] = useState('');
@@ -88,7 +87,6 @@ export function NotesPage() {
   }
 
   const filtered = notes.filter(n => {
-    if (search) { const q = search.toLowerCase(); return n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q); }
     if (folderId === 'starred') return n.is_starred;
     if (folderId === 'all') return true;
     return n.folder_id === folderId;
@@ -181,7 +179,6 @@ export function NotesPage() {
     setSelected(prev => prev ? { ...prev, folder_id: newFolderId } : null);
   }
 
-  const allTags = [...new Set(notes.flatMap(n => n.tags))];
   const groups = groupByDate(filtered);
 
   const StarIcon = ({ filled }: { filled: boolean }) => (
@@ -194,19 +191,18 @@ export function NotesPage() {
     <div className="notes-layout">
 
       {/* ── Left sidebar ── */}
-      <div className="notes-sidebar">
+      <div className={`notes-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
 
+        <div className="notes-sidebar-top">
+          {!sidebarCollapsed && <span className="ns-section-title">Папки</span>}
+          <button className="notes-sidebar-toggle" onClick={() => setSidebarCollapsed(v => !v)} title={sidebarCollapsed ? 'Открыть меню заметок' : 'Свернуть меню заметок'}>
+            ☰
+          </button>
+        </div>
+
+        {!sidebarCollapsed && (
+          <>
         <div className="ns-section">
-          <div className="ns-section-header">
-            <span className="ns-section-title">Папки</span>
-            <button className="ns-icon-btn" onClick={() => setShowNewFolder(true)} title="Новая папка">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* All notes */}
           <button className={`ns-folder-item${folderId === 'all' ? ' active' : ''}`} onClick={() => setFolderId('all')}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
@@ -215,7 +211,6 @@ export function NotesPage() {
             <span className="ns-count">{notes.length}</span>
           </button>
 
-          {/* Starred */}
           <button className={`ns-folder-item${folderId === 'starred' ? ' active' : ''}`} onClick={() => setFolderId('starred')}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -224,7 +219,6 @@ export function NotesPage() {
             <span className="ns-count">{notes.filter(n => n.is_starred).length}</span>
           </button>
 
-          {/* User folders */}
           {folders.map(f => (
             <button key={f.id} className={`ns-folder-item${folderId === f.id ? ' active' : ''}`} onClick={() => setFolderId(f.id)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill={f.color + '28'} stroke={f.color} strokeWidth="2">
@@ -236,75 +230,25 @@ export function NotesPage() {
           ))}
         </div>
 
-        <div className="ns-section">
-          <div className="ns-section-header">
-            <span className="ns-section-title">Теги</span>
+        <div className="notes-list-panel">
+          <div className="nl-history-header">
+            <span className="ns-section-title">История</span>
           </div>
-          {allTags.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#94A3B8', padding: '2px 0' }}>Тегов пока нет</div>
+
+          {loading ? (
+            <div style={{ padding: '20px', color: '#94A3B8', textAlign: 'center', fontSize: 13 }}>Загрузка...</div>
+          ) : filtered.length === 0 ? (
+            <div className="nl-empty">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+              </svg>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#94A3B8', marginTop: 8 }}>Заметок пока нет</div>
+              <div style={{ fontSize: 12, color: '#CBD5E1' }}>Создай заметку в редакторе справа</div>
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {allTags.map(tag => <span key={tag} className="ns-tag">{tag}</span>)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Middle: notes list ── */}
-      <div className="notes-list-panel">
-
-        {/* Toolbar */}
-        <div className="nl-toolbar">
-          <div className="nl-search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input placeholder="Поиск заметок..." value={search} onChange={e => setSearch(e.target.value)}/>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button className={`nl-view-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')} title="Список">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <line x1="3" y1="12" x2="21" y2="12"/>
-                <line x1="3" y1="18" x2="21" y2="18"/>
-              </svg>
-            </button>
-            <button className={`nl-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')} title="Сетка">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <rect x="3" y="3" width="8" height="8" rx="1"/>
-                <rect x="13" y="3" width="8" height="8" rx="1"/>
-                <rect x="3" y="13" width="8" height="8" rx="1"/>
-                <rect x="13" y="13" width="8" height="8" rx="1"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* New note quick button */}
-        <button className="nl-new-btn" onClick={createNote}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Новая заметка
-        </button>
-
-        {/* Notes */}
-        {loading ? (
-          <div style={{ padding: '20px', color: '#94A3B8', textAlign: 'center', fontSize: 13 }}>Загрузка...</div>
-        ) : filtered.length === 0 ? (
-          <div className="nl-empty">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
-            </svg>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#94A3B8', marginTop: 8 }}>
-              {search ? 'Ничего не найдено' : 'Заметок пока нет'}
-            </div>
-            {!search && <div style={{ fontSize: 12, color: '#CBD5E1' }}>Нажми «Новая заметка» чтобы начать</div>}
-          </div>
-        ) : viewMode === 'list' ? (
-          <div className="nl-list">
+            <div className="nl-list">
             {groups.map(g => (
               <div key={g.label}>
                 <div className="nl-group-label">{g.label}</div>
@@ -328,30 +272,10 @@ export function NotesPage() {
                 ))}
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="nl-grid">
-            {filtered.map(note => (
-              <div key={note.id} className={`nl-grid-item${selected?.id === note.id ? ' active' : ''}`} onClick={() => openNote(note)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div className="nl-item-title" style={{ flex: 1 }}>{note.title || 'Без названия'}</div>
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    <button className="nl-star-btn" onClick={e => toggleStar(note, e)}><StarIcon filled={note.is_starred}/></button>
-                    <button className="nl-star-btn nl-delete-btn" onClick={e => { e.stopPropagation(); deleteNote(note); }} title="Удалить">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div className="nl-item-preview" style={{ marginTop: 6, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {preview(note.content)}
-                </div>
-                <div className="nl-item-meta" style={{ marginTop: 8 }}><span>{fmtDate(note.updated_at)}</span></div>
-              </div>
-            ))}
-          </div>
+            </div>
+          )}
+        </div>
+          </>
         )}
       </div>
 

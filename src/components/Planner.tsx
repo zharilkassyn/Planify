@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-type Task = { id: string; title: string; completed: boolean };
-type Habit = { id: string; name: string; color: string };
-type HabitLog = { habit_id: string; logged_date: string };
 type PEvent = { id: string; title: string; description: string; hour: number; end_hour: number; color: string; event_date: string };
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
 const EVENT_COLORS = ['#2563EB', '#0284C7', '#6366F1', '#0D9488', '#F59E0B', '#EF4444'];
-const HABIT_COLORS = ['#2563EB', '#38BDF8', '#10B981', '#6366F1', '#F59E0B', '#EF4444'];
 const DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
@@ -46,9 +42,6 @@ function getMonthCells(year: number, month: number) {
 }
 
 export function Planner() {
-  const [tasks,   setTasks]   = useState<Task[]>([]);
-  const [habits,  setHabits]  = useState<Habit[]>([]);
-  const [logs,    setLogs]    = useState<HabitLog[]>([]);
   const [allEvs,  setAllEvs]  = useState<PEvent[]>([]);
 
   const [view,    setView]    = useState<View>('day');
@@ -58,13 +51,6 @@ export function Planner() {
 
   const [showEF, setShowEF] = useState(false);
   const [newEv, setNewEv]   = useState({ title: '', desc: '', hour: 9, end: 10, color: '#2563EB', date: todayStr() });
-
-  const [showHF, setShowHF] = useState(false);
-  const [newH,  setNewH]    = useState({ name: '', color: '#2563EB' });
-
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskModalTitle, setTaskModalTitle] = useState('');
-  const [taskModalError, setTaskModalError] = useState('');
 
   // ── computed dates ──
   const today    = new Date();
@@ -84,17 +70,6 @@ export function Planner() {
   const monthLabel = `${MONTH_NAMES[monthDate.getMonth()]} ${monthDate.getFullYear()}`;
 
   // ── load ──
-  async function loadHabitsAndTasks() {
-    const [tr, hr, lr] = await Promise.all([
-      supabase.from('entries').select('id, title, completed').order('created_at', { ascending: false }),
-      supabase.from('habits').select('id, name, color').order('created_at'),
-      supabase.from('habit_logs').select('habit_id, logged_date'),
-    ]);
-    if (tr.data) setTasks(tr.data as Task[]);
-    if (hr.data) setHabits(hr.data);
-    if (lr.data) setLogs(lr.data);
-  }
-
   async function loadEvents() {
     let query = supabase.from('planner_events').select('id, title, description, hour, end_hour, color, event_date');
     if (view === 'day') {
@@ -110,7 +85,6 @@ export function Planner() {
     setAllEvs(data ?? []);
   }
 
-  useEffect(() => { loadHabitsAndTasks(); }, []);
   useEffect(() => { loadEvents(); }, [view, dayOff, weekOff, monOff]);
 
   // ── event CRUD ──
@@ -129,55 +103,6 @@ export function Planner() {
     setAllEvs(ev => ev.filter(e => e.id !== id));
   }
 
-  // ── task CRUD ──
-  async function addTask() {
-    const text = taskModalTitle.trim();
-    if (!text) { setTaskModalError('Введи название задачи'); return; }
-    setTaskModalError('');
-    const { data, error } = await supabase.from('entries').insert({ title: text, completed: false }).select().single();
-    if (error) { setTaskModalError(error.message); return; }
-    if (data) { setTasks(t => [{ id: data.id, title: data.title, completed: false }, ...t]); }
-    setTaskModalTitle('');
-    setShowTaskModal(false);
-  }
-
-  function openTaskModal() {
-    setTaskModalTitle('');
-    setTaskModalError('');
-    setShowTaskModal(true);
-  }
-
-  async function toggleTask(id: string, completed: boolean) {
-    await supabase.from('entries').update({ completed: !completed }).eq('id', id);
-    setTasks(ts => ts.map(t => t.id === id ? { ...t, completed: !completed } : t));
-  }
-
-  // ── habit CRUD ──
-  async function addHabit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newH.name.trim()) return;
-    const { data } = await supabase.from('habits').insert({ name: newH.name.trim(), color: newH.color }).select().single();
-    if (data) { setHabits(h => [...h, data]); setNewH({ name: '', color: '#2563EB' }); setShowHF(false); }
-  }
-
-  async function deleteHabit(id: string) {
-    await supabase.from('habits').delete().eq('id', id);
-    setHabits(h => h.filter(x => x.id !== id));
-    setLogs(l => l.filter(x => x.habit_id !== id));
-  }
-
-  async function toggleLog(habitId: string) {
-    const td = todayStr();
-    const exists = logs.find(l => l.habit_id === habitId && l.logged_date === td);
-    if (exists) {
-      await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('logged_date', td);
-      setLogs(l => l.filter(x => !(x.habit_id === habitId && x.logged_date === td)));
-    } else {
-      const { data } = await supabase.from('habit_logs').insert({ habit_id: habitId, logged_date: td }).select().single();
-      if (data) setLogs(l => [...l, data]);
-    }
-  }
-
   // ── nav ──
   function navPrev() {
     if (view === 'day')   setDayOff(o => o - 1);
@@ -189,12 +114,6 @@ export function Planner() {
     if (view === 'week')  setWeekOff(o => o + 1);
     if (view === 'month') setMonOff(o => o + 1);
   }
-
-  const done = tasks.filter(t => t.completed).length;
-  const pct  = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
-
-  // last 7 days for habit dots
-  const last7 = Array.from({ length: 7 }, (_, i) => toStr(addDays(today, i - 6)));
 
   // ── renders ──
   function renderDayGrid(date: string, evList: PEvent[], compact = false) {
@@ -310,34 +229,6 @@ export function Planner() {
 
   return (
     <div className="planner-layout">
-      {showTaskModal && (
-        <div className="modal-overlay" onClick={() => setShowTaskModal(false)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <span className="modal-title">Новая задача</span>
-              <button className="modal-close" onClick={() => setShowTaskModal(false)}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            </div>
-            <label className="modal-label">Название</label>
-            <input
-              className="modal-input"
-              placeholder="Например: Выучить главу 3…"
-              value={taskModalTitle}
-              autoFocus
-              onChange={e => setTaskModalTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addTask(); }}
-            />
-            {taskModalError && <p className="modal-error">{taskModalError}</p>}
-            <div className="modal-actions">
-              <button className="modal-btn-cancel" onClick={() => setShowTaskModal(false)}>Отмена</button>
-              <button className="modal-btn-add" onClick={addTask}>+ Добавить</button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* ── LEFT ── */}
       <div className="planner-main">
         <div className="dash-header" style={{ marginBottom: 20 }}>
@@ -400,94 +291,6 @@ export function Planner() {
         {view === 'day'   && renderDayGrid(currentDate, allEvs)}
         {view === 'week'  && <WeekView />}
         {view === 'month' && <MonthView />}
-      </div>
-
-      {/* ── RIGHT ── */}
-      <div className="planner-right">
-        <div className="panel">
-          <div className="panel-header">
-            <span className="panel-title">Список задач</span>
-            <button className="add-task-btn" style={{ fontSize: 12, padding: '5px 10px' }} onClick={openTaskModal}>+ Добавить</button>
-          </div>
-          <div className="prog-bar-wrap">
-            <div className="prog-bar-track"><div className="prog-bar-fill" style={{ width: `${pct}%` }} /></div>
-            <span className="prog-pct">{pct}%</span>
-          </div>
-          <div className="check-list">
-            {tasks.length === 0 && <p style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '12px 0' }}>Задач нет. Добавь первую!</p>}
-            {tasks.map(t => (
-              <div key={t.id} className={`check-row${t.completed ? ' done' : ''}`} onClick={() => toggleTask(t.id, t.completed)}>
-                <div className={`chk${t.completed ? ' chk-done' : ''}`}>
-                  {t.completed && <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>}
-                </div>
-                <span className="check-label">{t.title}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <span className="panel-title">Привычки</span>
-            <button style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 12, cursor: 'pointer', padding: 0, fontWeight: 600 }}
-              onClick={() => setShowHF(v => !v)}>+ Добавить</button>
-          </div>
-          {showHF && (
-            <form onSubmit={addHabit} style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-              <input className="planner-input" style={{ flex: 1, minWidth: 0 }} placeholder="Название привычки"
-                value={newH.name} onChange={e => setNewH(v => ({ ...v, name: e.target.value }))} />
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                {HABIT_COLORS.map(c => (
-                  <button key={c} type="button"
-                    style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: newH.color === c ? '3px solid #1E293B' : '2px solid transparent', padding: 0, cursor: 'pointer' }}
-                    onClick={() => setNewH(v => ({ ...v, color: c }))} />
-                ))}
-              </div>
-              <button type="submit" className="add-task-btn" style={{ padding: '7px 12px' }}>Сохранить</button>
-            </form>
-          )}
-          {habits.length === 0 && !showHF && (
-            <p style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '12px 0' }}>Привычек нет. Нажми «+ Добавить»!</p>
-          )}
-          {habits.map(h => {
-            const todayLogged = logs.some(l => l.habit_id === h.id && l.logged_date === todayStr());
-            const streak = logs.filter(l => l.habit_id === h.id).length;
-            return (
-              <div key={h.id} className="habit-row">
-                <div className="habit-dot-icon" style={{ background: h.color + '20', color: h.color }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                </div>
-                <div className="habit-body">
-                  <div className="habit-name">{h.name}</div>
-                  <div className="habit-dots">
-                    {last7.map(d => (
-                      <div key={d} className="hdot" style={{ background: logs.some(l => l.habit_id === h.id && l.logged_date === d) ? h.color : '#E2E8F0' }} />
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  <span className="habit-streak">{streak} дн.</span>
-                  <button onClick={() => toggleLog(h.id)}
-                    style={{ fontSize: 11, padding: '3px 7px', background: todayLogged ? h.color : 'transparent', color: todayLogged ? '#fff' : h.color, border: `1px solid ${h.color}`, borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
-                    {todayLogged ? '✓' : '+'}
-                  </button>
-                  <button onClick={() => deleteHabit(h.id)}
-                    style={{ background: 'none', border: 'none', color: '#CBD5E1', cursor: 'pointer', fontSize: 13, padding: 0 }}>
-                    удалить
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="quote-card">
-          <div className="quote-mark">"</div>
-          <p>План — это мечта с дедлайном.</p>
-          <span>— Наполеон Хилл</span>
-        </div>
       </div>
     </div>
   );

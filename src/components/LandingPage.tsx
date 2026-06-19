@@ -7,7 +7,7 @@ const LAND_FEATURES = [
   { icon: '🃏', title: 'Флеш-карты', desc: 'Запоминай быстрее с карточками, повторениями и готовыми колодами от ИИ.' },
   { icon: '📝', title: 'Заметки', desc: 'Пиши, структурируй и сохраняй важное в одном спокойном месте.' },
   { icon: '🤖', title: 'ИИ-помощник', desc: 'Получай конспекты, объяснения, тесты, карточки и помощь по материалам.' },
-  { icon: '📊', title: 'Прогресс и аналитика', desc: 'Отслеживай рост, привычки и результаты каждый учебный день.' },
+  { icon: '📊', title: 'Статистика', desc: 'Отслеживай задачи, фокус-время и результаты каждый учебный день.' },
 ];
 
 export function LandingPage() {
@@ -69,14 +69,14 @@ export function LandingPage() {
           </h1>
 
           <p className="land-desc">
-            Планируй, учись, отслеживай прогресс и используй ИИ-помощника, который поможет понять и запомнить больше.
+            Планируй, учись, отслеживай результаты и используй ИИ-помощника, который поможет понять и запомнить больше.
           </p>
 
           <ul className="land-features">
             {[
               { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>, title: 'Умный планировщик', desc: 'Составляй расписание и следуй плану' },
               { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/></svg>, title: 'Фокус-таймер', desc: 'Концентрируйся с помощью Pomodoro' },
-              { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, title: 'Отслеживание прогресса', desc: 'Визуализируй свои достижения' },
+              { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>, title: 'Статистика', desc: 'Визуализируй свои достижения' },
               { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>, title: 'ИИ-помощник', desc: 'Конспекты, флеш-карты, объяснения и другое' },
             ].map(f => (
               <li key={f.title} className="land-feature-item">
@@ -116,7 +116,6 @@ export function LandingPage() {
                 {lbl:'Главная',act:true,icon:'🏠'},
                 {lbl:'Планировщик',act:false,icon:'📅'},
                 {lbl:'Таймер',act:false,icon:'⏱'},
-                {lbl:'Прогресс',act:false,icon:'📊'},
                 {lbl:'ИИ-помощник',act:false,icon:'🤖'},
                 {lbl:'Флеш-карты',act:false,icon:'🃏'},
                 {lbl:'Заметки',act:false,icon:'📝'},
@@ -152,7 +151,7 @@ export function LandingPage() {
 
               <div style={{display:'flex',gap:10}}>
                 <div style={{flex:1,background:'white',borderRadius:12,padding:12,border:'1px solid #E2E8F0'}}>
-                  <div style={{fontSize:11,fontWeight:700,color:'#1E293B',marginBottom:10}}>Прогресс за неделю</div>
+                  <div style={{fontSize:11,fontWeight:700,color:'#1E293B',marginBottom:10}}>Статистика за неделю</div>
                   <div style={{display:'flex',alignItems:'flex-end',gap:5,height:58}}>
                     {[40,55,70,45,90,60,30].map((h,i) => (
                       <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,height:'100%',justifyContent:'flex-end'}}>
