@@ -3,7 +3,6 @@ import Matter from 'matter-js';
 import { supabase } from '../lib/supabase';
 
 type CupMode = 'classic' | 'time' | 'hard' | 'endless';
-type Tool = 'draw' | 'erase';
 
 type DrawLine = {
   id: string;
@@ -50,6 +49,8 @@ const SCENE_W = 860;
 const SCENE_H = 560;
 const GLASS = { x: 600, y: 380, w: 120, h: 142 };
 const SOURCE = { x: 216, y: 86 };
+const GLASS_FILL_PARTICLES = 68;
+const WIN_FILL = 0.82;
 
 const emptyStats: CupStats = {
   completed: 0,
@@ -76,29 +77,6 @@ function createSave(mode: CupMode = 'classic', level = 1): CupSave {
   };
 }
 
-function parseGame(raw: string | null): CupSave | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as CupSave;
-    if (typeof parsed.level === 'number' && Array.isArray(parsed.lines)) {
-      const level = Math.max(1, Math.min(MAX_LEVELS, parsed.level));
-      const completed = Math.max(0, Math.min(MAX_LEVELS, parsed.completed ?? 0));
-      return {
-        ...createSave('classic', level),
-        ...parsed,
-        level,
-        mode: 'classic',
-        completed,
-        paused: false,
-        undone: Array.isArray(parsed.undone) ? parsed.undone : [],
-      };
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): CupStats {
   if (!raw) return emptyStats;
   try {
@@ -113,11 +91,6 @@ function parseStats(raw: string | null): CupStats {
   } catch {
     return emptyStats;
   }
-}
-
-function coerceGame(value: unknown): CupSave | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
 }
 
 function coerceStats(value: unknown): CupStats {
@@ -164,70 +137,89 @@ function waterDelayForLevel(level: number) {
   return Math.max(74, 128 - Math.floor(Math.min(MAX_LEVELS, level) * 1.1));
 }
 
+function waterLimitForLevel(level: number) {
+  return Math.max(80, 94 - Math.floor(Math.min(MAX_LEVELS, level) / 4));
+}
+
 type LevelObstacle =
   | { kind: 'rect'; x: number; y: number; w: number; h: number; angle: number; color: string; label: string }
   | { kind: 'circle'; x: number; y: number; r: number; color: string; label: string };
 
 function levelObstacles(level: number): LevelObstacle[] {
   const safeLevel = Math.max(1, Math.min(MAX_LEVELS, level));
-  const drift = (safeLevel % 6) - 3;
+  const pattern = (safeLevel - 1) % 10;
+  const tier = Math.floor((safeLevel - 1) / 10);
+  const direction = pattern % 2 === 0 ? 1 : -1;
   const obstacles: LevelObstacle[] = [
     {
       kind: 'rect',
-      x: 396 + drift * 9,
-      y: 248 + Math.floor(safeLevel / 12) * 8,
-      w: 140,
+      x: 330 + pattern * 18,
+      y: 210 + (pattern % 4) * 24 + tier * 8,
+      w: 126 + (pattern % 3) * 24,
       h: 12,
-      angle: 0.16 + (safeLevel % 5) * 0.035,
+      angle: direction * (0.18 + (pattern % 4) * 0.08),
       color: 'rgba(124,58,237,0.28)',
       label: 'level-ramp',
     },
   ];
 
-  if (safeLevel >= 5) {
+  if (safeLevel >= 2) {
+    obstacles.push({
+      kind: 'rect',
+      x: 494 - pattern * 10,
+      y: 330 - (pattern % 5) * 16,
+      w: 92 + tier * 10,
+      h: 10,
+      angle: -direction * (0.24 + (pattern % 3) * 0.1),
+      color: 'rgba(14,165,233,0.24)',
+      label: 'level-catcher',
+    });
+  }
+
+  if (safeLevel >= 4) {
     obstacles.push({
       kind: 'circle',
-      x: 476 + (safeLevel % 4) * 12,
-      y: 178 + (safeLevel % 5) * 7,
-      r: 24 + Math.min(8, Math.floor(safeLevel / 10)),
+      x: 438 + (pattern % 5) * 26,
+      y: 156 + (pattern % 4) * 28,
+      r: 20 + (pattern % 3) * 5 + tier,
       color: 'rgba(15,23,42,0.08)',
       label: 'level-bumper',
     });
   }
 
-  if (safeLevel >= 10) {
+  if (safeLevel >= 9) {
     obstacles.push({
       kind: 'rect',
-      x: 324 + (safeLevel % 5) * 10,
-      y: 360 - (safeLevel % 4) * 8,
-      w: 100,
+      x: 282 + (pattern % 6) * 22,
+      y: 386 - (pattern % 5) * 18,
+      w: 86 + (pattern % 4) * 12,
       h: 10,
-      angle: -0.32 - (safeLevel % 4) * 0.045,
-      color: 'rgba(14,165,233,0.24)',
+      angle: direction * (0.44 + (pattern % 2) * 0.18),
+      color: 'rgba(245,158,11,0.22)',
       label: 'level-narrow',
     });
   }
 
-  if (safeLevel >= 22) {
+  if (safeLevel >= 16) {
     obstacles.push({
       kind: 'circle',
-      x: 540 - (safeLevel % 5) * 9,
-      y: 280 + (safeLevel % 4) * 8,
-      r: 20 + Math.min(7, Math.floor(safeLevel / 12)),
+      x: 560 - (pattern % 5) * 18,
+      y: 260 + (pattern % 4) * 22,
+      r: 18 + (pattern % 4) * 4 + tier,
       color: 'rgba(37,99,235,0.12)',
       label: 'level-bumper-hard',
     });
   }
 
-  if (safeLevel >= 36) {
+  if (safeLevel >= 28) {
     obstacles.push({
       kind: 'rect',
-      x: 214 + (safeLevel % 3) * 12,
-      y: 186,
-      w: 88,
+      x: 218 + (pattern % 4) * 16,
+      y: 160 + (pattern % 3) * 18,
+      w: 82 + (pattern % 3) * 16,
       h: 10,
-      angle: 0.42,
-      color: 'rgba(245,158,11,0.22)',
+      angle: direction * 0.48,
+      color: 'rgba(16,185,129,0.22)',
       label: 'level-start-ramp',
     });
   }
@@ -248,6 +240,18 @@ function createLineBody(a: { x: number; y: number }, b: { x: number; y: number }
   });
 }
 
+function pushWaterPair(bodyA: Matter.Body, bodyB: Matter.Body) {
+  if (bodyA.label !== 'water' || bodyB.label !== 'water') return;
+  const dx = bodyB.position.x - bodyA.position.x;
+  const dy = bodyB.position.y - bodyA.position.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const force = 0.000018;
+  const x = (dx / length) * force;
+  const y = (dy / length) * force;
+  Matter.Body.applyForce(bodyA, bodyA.position, { x: -x, y: -y });
+  Matter.Body.applyForce(bodyB, bodyB.position, { x, y });
+}
+
 export function FillCupGame({ onBack }: { onBack: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -258,20 +262,26 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
   const drawingRef = useRef(false);
   const currentLineRef = useRef<DrawLine | null>(null);
   const lastSyncRef = useRef(0);
+  const spawnedWaterRef = useRef(0);
+  const lastWaterSpawnAtRef = useRef(0);
+  const failTimerRef = useRef<number | null>(null);
 
-  const [save, setSave] = useState<CupSave>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? createSave());
+  const [save, setSave] = useState<CupSave>(() => createSave());
   const [stats, setStats] = useState<CupStats>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
-  const [tool, setTool] = useState<Tool>('draw');
   const [fill, setFill] = useState(0);
   const [won, setWon] = useState(false);
   const [started, setStarted] = useState(false);
   const [flowing, setFlowing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [waterUsed, setWaterUsed] = useState(0);
   const [splashes, setSplashes] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [syncState, setSyncState] = useState<'saved' | 'saving' | 'offline'>('saved');
 
   const limit = lineLimit(save.level);
   const usedLength = totalLength(save.lines);
   const movesLimit = movesLimitForLevel(save.level);
+  const waterLimit = waterLimitForLevel(save.level);
+  const waterLeft = Math.max(0, waterLimit - waterUsed);
 
   const loadCloud = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -284,9 +294,7 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
       .maybeSingle();
     if (error || !data) return;
     const row = data as CupRow;
-    const cloudGame = coerceGame(row.current_game);
     const cloudStats = coerceStats(row.stats);
-    if (cloudGame) setSave(cloudGame);
     setStats(cloudStats);
   }, []);
 
@@ -346,6 +354,9 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
     waterRef.current = [];
     lineBodiesRef.current = [];
     Matter.Composite.add(engine.world, [ground, leftWall, rightWall, cupLeft, cupRight, cupBottom, ...obstacles]);
+    Matter.Events.on(engine, 'collisionActive', event => {
+      event.pairs.forEach(pair => pushWaterPair(pair.bodyA, pair.bodyB));
+    });
     engineRef.current = engine;
     const runner = Matter.Runner.create();
     runnerRef.current = runner;
@@ -356,6 +367,10 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     setupWorld(save.level, save.lines);
     return () => {
+      if (failTimerRef.current) {
+        window.clearTimeout(failTimerRef.current);
+        failTimerRef.current = null;
+      }
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       if (runnerRef.current && engineRef.current) Matter.Runner.stop(runnerRef.current);
       if (engineRef.current) Matter.Engine.clear(engineRef.current);
@@ -367,32 +382,42 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
   }, [save.lines]);
 
   useEffect(() => {
-    if (!started || save.paused || won) return undefined;
+    if (!started || save.paused || won || failed) return undefined;
     const id = window.setInterval(() => {
       setSave(current => ({ ...current, seconds: current.seconds + 1 }));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [save.paused, started, won]);
+  }, [failed, save.paused, started, won]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (!engineRef.current || !started || !flowing || save.paused || won) return;
-      const particle = Matter.Bodies.circle(SOURCE.x + Math.random() * 16 - 8, SOURCE.y, 5, {
-        restitution: 0.18,
-        friction: 0.01,
-        frictionAir: 0.002,
+      if (!engineRef.current || !started || !flowing || save.paused || won || failed) return;
+      if (spawnedWaterRef.current >= waterLimit) return;
+      const particle = Matter.Bodies.circle(SOURCE.x + 28 + Math.random() * 14 - 7, SOURCE.y + 18, 6, {
+        restitution: 0.38,
+        friction: 0.03,
+        frictionAir: 0.0012,
+        density: 0.0024,
+        slop: 0.01,
         label: 'water',
         render: { fillStyle: '#38BDF8' },
       });
-      Matter.Body.setVelocity(particle, { x: 1.8 + Math.random() * 1.2, y: 0.4 });
+      Matter.Body.setVelocity(particle, { x: 1.2 + Math.random() * 1.4, y: 0.2 + Math.random() * 0.4 });
       waterRef.current.push({ body: particle, bornAt: Date.now() });
+      spawnedWaterRef.current += 1;
+      lastWaterSpawnAtRef.current = Date.now();
+      setWaterUsed(spawnedWaterRef.current);
       Matter.Composite.add(engineRef.current.world, particle);
     }, waterDelayForLevel(save.level));
     return () => window.clearInterval(id);
-  }, [flowing, save.level, save.paused, started, won]);
+  }, [failed, flowing, save.level, save.paused, started, waterLimit, won]);
 
   function completeLevel(currentFill: number) {
-    if (currentFill < 0.82 || won) return;
+    if (currentFill < WIN_FILL || won) return;
+    if (failTimerRef.current) {
+      window.clearTimeout(failTimerRef.current);
+      failTimerRef.current = null;
+    }
     setWon(true);
     const today = todayKey();
     const stars = save.seconds < 50 ? 3 : save.seconds < 90 ? 2 : 1;
@@ -417,6 +442,16 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
     setSave(nextSave);
     setSplashes(Array.from({ length: 16 }, (_, index) => ({ id: `confetti-${Date.now()}-${index}`, x: 50 + Math.random() * 90, y: 70 + Math.random() * 40 })));
     void saveCloud(nextSave, nextStats, true);
+  }
+
+  function restartAfterMiss() {
+    if (failTimerRef.current || won) return;
+    setFailed(true);
+    setFlowing(false);
+    failTimerRef.current = window.setTimeout(() => {
+      failTimerRef.current = null;
+      reset(save.level, save.mode, true);
+    }, 900);
   }
 
   function drawScene() {
@@ -447,27 +482,41 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
     ctx.arc(760, 190, 22, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#7DD3FC';
-    ctx.shadowColor = 'rgba(56,189,248,0.28)';
-    ctx.shadowBlur = 18;
+    const faucetGradient = ctx.createLinearGradient(SOURCE.x - 76, SOURCE.y - 56, SOURCE.x + 28, SOURCE.y + 12);
+    faucetGradient.addColorStop(0, '#E0F2FE');
+    faucetGradient.addColorStop(0.48, '#60A5FA');
+    faucetGradient.addColorStop(1, '#1D4ED8');
+    ctx.shadowColor = 'rgba(37,99,235,0.22)';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = faucetGradient;
     ctx.beginPath();
-    ctx.roundRect(SOURCE.x - 28, SOURCE.y - 28, 56, 36, 16);
+    ctx.roundRect(SOURCE.x - 86, SOURCE.y - 54, 20, 72, 9);
+    ctx.roundRect(SOURCE.x - 76, SOURCE.y - 46, 88, 18, 9);
+    ctx.roundRect(SOURCE.x - 4, SOURCE.y - 46, 22, 48, 9);
+    ctx.roundRect(SOURCE.x + 4, SOURCE.y - 4, 34, 18, 9);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '700 13px Inter, sans-serif';
-    ctx.fillText('water', SOURCE.x - 18, SOURCE.y - 7);
-
-    ctx.strokeStyle = '#93C5FD';
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(15,23,42,0.12)';
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(SOURCE.x, SOURCE.y + 8);
-    ctx.bezierCurveTo(SOURCE.x + 18, SOURCE.y + 30, SOURCE.x + 28, SOURCE.y + 52, SOURCE.x + 42, SOURCE.y + 70);
+    ctx.moveTo(SOURCE.x - 64, SOURCE.y - 37);
+    ctx.lineTo(SOURCE.x + 3, SOURCE.y - 37);
+    ctx.moveTo(SOURCE.x + 9, SOURCE.y - 26);
+    ctx.lineTo(SOURCE.x + 9, SOURCE.y - 6);
     ctx.stroke();
+    ctx.fillStyle = '#2563EB';
+    ctx.beginPath();
+    ctx.roundRect(SOURCE.x - 32, SOURCE.y - 70, 52, 10, 5);
+    ctx.roundRect(SOURCE.x - 12, SOURCE.y - 84, 12, 26, 6);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(56,189,248,0.32)';
+    ctx.beginPath();
+    ctx.arc(SOURCE.x + 28, SOURCE.y + 18, 7, 0, Math.PI * 2);
+    ctx.fill();
 
     save.lines.forEach(line => {
-      ctx.strokeStyle = tool === 'erase' ? 'rgba(239,68,68,0.75)' : '#2563EB';
+      ctx.strokeStyle = '#2563EB';
       ctx.lineWidth = 10;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -520,15 +569,27 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
       const { x, y } = item.body.position;
       return x > GLASS.x - GLASS.w / 2 + 8 && x < GLASS.x + GLASS.w / 2 - 8 && y > GLASS.y - GLASS.h / 2 && y < GLASS.y + GLASS.h / 2;
     }).length;
-    const nextFill = Math.min(1, inGlass / 68);
+    const nextFill = Math.min(1, inGlass / GLASS_FILL_PARTICLES);
     setFill(nextFill);
     completeLevel(nextFill);
+
+    if (
+      flowing &&
+      !won &&
+      !failed &&
+      spawnedWaterRef.current >= waterLimit &&
+      lastWaterSpawnAtRef.current > 0 &&
+      Date.now() - lastWaterSpawnAtRef.current > 3600 &&
+      nextFill < WIN_FILL
+    ) {
+      restartAfterMiss();
+    }
 
     ctx.fillStyle = 'rgba(56,189,248,0.92)';
     waterRef.current.forEach(item => {
       const { x, y } = item.body.position;
       ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
       ctx.fill();
     });
 
@@ -568,13 +629,8 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
 
   function startDraw(event: React.PointerEvent<HTMLCanvasElement>) {
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (!started || save.paused || won || flowing) return;
+    if (!started || save.paused || won || flowing || failed) return;
     const point = pointFromEvent(event);
-    if (tool === 'erase') {
-      const target = save.lines.find(line => line.points.some(p => distance(p, point) < 24));
-      if (target) setSave(current => ({ ...current, lines: current.lines.filter(line => line.id !== target.id) }));
-      return;
-    }
     if (save.lines.length >= movesLimit || usedLength >= limit) return;
     drawingRef.current = true;
     currentLineRef.current = { id: `line-${Date.now()}`, points: [point] };
@@ -596,33 +652,29 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
     drawingRef.current = false;
     currentLineRef.current = null;
     if (finished.points.length < 2) return;
+    spawnedWaterRef.current = 0;
+    lastWaterSpawnAtRef.current = 0;
+    setWaterUsed(0);
     setSave(current => ({ ...current, lines: [...current.lines, finished], undone: [] }));
+    setFlowing(true);
     if ('vibrate' in navigator) navigator.vibrate(12);
   }
 
-  function undo() {
-    setSave(current => {
-      const last = current.lines[current.lines.length - 1];
-      if (!last) return current;
-      return { ...current, lines: current.lines.slice(0, -1), undone: [last, ...current.undone] };
-    });
-  }
-
-  function redo() {
-    setSave(current => {
-      const next = current.undone[0];
-      if (!next) return current;
-      return { ...current, lines: [...current.lines, next], undone: current.undone.slice(1) };
-    });
-  }
-
   function reset(level = save.level, mode = save.mode, nextStarted = started) {
+    if (failTimerRef.current) {
+      window.clearTimeout(failTimerRef.current);
+      failTimerRef.current = null;
+    }
     if (engineRef.current) {
       Matter.Composite.remove(engineRef.current.world, waterRef.current.map(item => item.body));
       waterRef.current = [];
     }
+    spawnedWaterRef.current = 0;
+    lastWaterSpawnAtRef.current = 0;
+    setWaterUsed(0);
     setFill(0);
     setWon(false);
+    setFailed(false);
     setStarted(nextStarted);
     setFlowing(false);
     setSplashes([]);
@@ -630,7 +682,7 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
   }
 
   function nextLevel() {
-    reset(Math.min(MAX_LEVELS, save.level + 1), save.mode, false);
+    reset(Math.min(MAX_LEVELS, save.level + 1), save.mode, true);
   }
 
   function playGame() {
@@ -652,22 +704,13 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
 
       <section className="cup-topbar">
         <div><span>⭐ Уровень</span><strong>{save.level}/{MAX_LEVELS}</strong></div>
-        <div><span>Stars</span><strong>{'⭐'.repeat(save.stars)}</strong></div>
+        <div><span>💧 Вода</span><strong>{waterLeft}/{waterLimit}</strong></div>
         <div><span>✏️ Линии</span><strong>{save.lines.length}/{movesLimit}</strong></div>
         <div><span>⏱ Timer</span><strong>{formatTime(save.seconds)}</strong></div>
       </section>
 
       <main className="cup-layout">
         <section className="cup-game-card">
-          <div className="cup-tools">
-            <button type="button" className={tool === 'draw' ? 'active' : ''} onClick={() => setTool('draw')} disabled={!started || flowing}>✏️ Карандаш</button>
-            <button type="button" className={tool === 'erase' ? 'active' : ''} onClick={() => setTool('erase')} disabled={!started || flowing}>🧽 Ластик</button>
-            <button type="button" onClick={undo} disabled={!started || flowing}>↩️ Отменить</button>
-            <button type="button" onClick={redo} disabled={!started || flowing}>↪️ Повторить</button>
-            <button type="button" onClick={() => reset()}>🔄 Сброс</button>
-            <button type="button" className={save.sound ? 'active' : ''} onClick={() => setSave(current => ({ ...current, sound: !current.sound }))}>Sound</button>
-          </div>
-
           <div className="cup-canvas-wrap">
             <canvas
               ref={canvasRef}
@@ -697,9 +740,7 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
                 <button type="button" onClick={playGame}>Играть</button>
               </div>
             )}
-            {started && !flowing && !save.paused && !won && save.lines.length > 0 && (
-              <button type="button" className="cup-run-button" onClick={() => setFlowing(true)}>Пустить воду</button>
-            )}
+            {failed && !won && <div className="cup-fail-note">Воды не хватило</div>}
             {save.paused && !won && (
               <div className="cup-start-overlay">
                 <div className="cup-pause-menu">
@@ -724,7 +765,7 @@ export function FillCupGame({ onBack }: { onBack: () => void }) {
             <p>Time spent: <strong>{formatTime(save.seconds)}</strong></p>
             <div className="cup-win-actions">
               <button type="button" onClick={nextLevel}>Следующий уровень</button>
-              <button type="button" className="ghost" onClick={() => reset()}>Играть снова</button>
+              <button type="button" className="ghost" onClick={() => reset(save.level, save.mode, true)}>Играть снова</button>
               <button type="button" className="ghost" onClick={onBack}>Вернуться в игры</button>
             </div>
           </div>

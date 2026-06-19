@@ -125,17 +125,6 @@ function addRandomTile(cells: Cell[]) {
   return next;
 }
 
-function parseGame(raw: string | null): Save2048 | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Save2048;
-    if (Array.isArray(parsed.cells) && parsed.size) return parsed;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): Stats2048 {
   if (!raw) return emptyStats;
   try {
@@ -144,11 +133,6 @@ function parseStats(raw: string | null): Stats2048 {
   } catch {
     return emptyStats;
   }
-}
-
-function coerceGame(value: unknown): Save2048 | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
 }
 
 function coerceStats(value: unknown): Stats2048 {
@@ -223,7 +207,7 @@ function canMove(cells: Cell[], size: number) {
 
 export function Game2048({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<Stats2048>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
-  const [game, setGame] = useState<Save2048>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? createGame('classic'));
+  const [game, setGame] = useState<Save2048>(() => createGame('classic'));
   const [floating, setFloating] = useState<Array<{ id: string; text: string }>>([]);
   const [syncState, setSyncState] = useState<'saved' | 'saving' | 'offline'>('saved');
   const [started, setStarted] = useState(false);
@@ -241,9 +225,7 @@ export function Game2048({ onBack }: { onBack: () => void }) {
     const { data, error } = await supabase.from('game_2048_progress').select('current_game, stats').eq('user_id', userId).maybeSingle();
     if (error || !data) return;
     const row = data as Row2048;
-    const cloudGame = coerceGame(row.current_game);
     const cloudStats = coerceStats(row.stats);
-    if (cloudGame && !cloudGame.gameOver) setGame(cloudGame);
     setStats(cloudStats);
   }, []);
 

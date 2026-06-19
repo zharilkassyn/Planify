@@ -194,19 +194,6 @@ function isBoardComplete(values: Board, solution: Board) {
   return values.every((value, index) => value === solution[index]);
 }
 
-function parseGame(raw: string | null): SudokuSave | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as SudokuSave;
-    if (Array.isArray(parsed.values) && parsed.values.length === 81 && Array.isArray(parsed.solution) && parsed.solution.length === 81) {
-      return parsed;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): SudokuStats {
   if (!raw) return emptyStats;
   try {
@@ -223,11 +210,6 @@ function parseStats(raw: string | null): SudokuStats {
   }
 }
 
-function coerceGame(value: unknown): SudokuSave | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
-}
-
 function coerceStats(value: unknown): SudokuStats {
   if (!value) return emptyStats;
   return parseStats(JSON.stringify(value));
@@ -235,7 +217,7 @@ function coerceStats(value: unknown): SudokuStats {
 
 export function SudokuGame({ onBack }: { onBack: () => void }) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
-  const [game, setGame] = useState<SudokuSave>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? generateSudoku('easy'));
+  const [game, setGame] = useState<SudokuSave>(() => generateSudoku('easy'));
   const [stats, setStats] = useState<SudokuStats>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
   const [selected, setSelected] = useState<number | null>(null);
   const [notesMode, setNotesMode] = useState(false);
@@ -274,12 +256,7 @@ export function SudokuGame({ onBack }: { onBack: () => void }) {
 
     if (error || !data) return;
     const row = data as SudokuRow;
-    const cloudGame = coerceGame(row.current_game);
     const cloudStats = coerceStats(row.stats);
-    if (cloudGame && !cloudGame.completed) {
-      setGame(cloudGame);
-      setDifficulty(cloudGame.difficulty);
-    }
     setStats(cloudStats);
   }, []);
 

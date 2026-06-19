@@ -100,17 +100,6 @@ function createSave(mode: TennisMode = 'quick', difficulty: TennisDifficulty = '
   };
 }
 
-function parseGame(raw: string | null): TennisSave | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as TennisSave;
-    if (parsed.mode && parsed.difficulty) return parsed;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): TennisStats {
   if (!raw) return emptyStats;
   try {
@@ -119,11 +108,6 @@ function parseStats(raw: string | null): TennisStats {
   } catch {
     return emptyStats;
   }
-}
-
-function coerceGame(value: unknown): TennisSave | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
 }
 
 function coerceStats(value: unknown): TennisStats {
@@ -289,7 +273,7 @@ export function Tennis3DGame({ onBack }: { onBack: () => void }) {
   const lastRef = useRef(0);
   const lastSyncRef = useRef(0);
 
-  const [save, setSave] = useState<TennisSave>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? createSave());
+  const [save, setSave] = useState<TennisSave>(() => createSave());
   const [stats, setStats] = useState<TennisStats>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
   const [thinking, setThinking] = useState(false);
   const [thinkingProgress, setThinkingProgress] = useState(0);
@@ -308,9 +292,7 @@ export function Tennis3DGame({ onBack }: { onBack: () => void }) {
     const { data, error } = await supabase.from('tennis_progress').select('current_game, stats').eq('user_id', userId).maybeSingle();
     if (error || !data) return;
     const row = data as TennisRow;
-    const cloudGame = coerceGame(row.current_game);
     const cloudStats = coerceStats(row.stats);
-    if (cloudGame && !cloudGame.result) setSave(cloudGame);
     setStats(cloudStats);
   }, []);
 
@@ -641,9 +623,14 @@ export function Tennis3DGame({ onBack }: { onBack: () => void }) {
   }, [cameraMode, difficulty.error, difficulty.reaction, difficulty.speed, gameStopped, save.mode]);
 
   function pointerFromJoy(event: React.PointerEvent<HTMLDivElement>) {
+    if (gameStopped) return;
+    event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-    const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+    const rawX = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+    const rawY = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+    const length = Math.hypot(rawX, rawY);
+    const x = length > 1 ? rawX / length : rawX;
+    const y = length > 1 ? rawY / length : rawY;
     const next = { active: true, x: clamp(x, -1, 1), y: clamp(y, -1, 1) };
     joystickRef.current = next;
     setJoystickVisual({ x: next.x, y: next.y });
@@ -750,13 +737,30 @@ export function Tennis3DGame({ onBack }: { onBack: () => void }) {
               <i style={{ width: `${thinking ? thinkingProgress : 0}%` }} />
             </div>
             <div
-              className="tennis-joystick"
-              onPointerDown={pointerFromJoy}
+              className={`tennis-joystick${joystickRef.current.active ? ' active' : ''}`}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                pointerFromJoy(event);
+              }}
               onPointerMove={event => joystickRef.current.active && pointerFromJoy(event)}
-              onPointerUp={stopJoystick}
+              onPointerUp={(event) => {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+                stopJoystick();
+              }}
               onPointerCancel={stopJoystick}
+              aria-label="Джойстик движения"
             >
-              <span style={{ transform: `translate(${joystickVisual.x * 22}px, ${joystickVisual.y * 22}px)` }} />
+              <i className="tennis-joy-arrow up" />
+              <i className="tennis-joy-arrow right" />
+              <i className="tennis-joy-arrow down" />
+              <i className="tennis-joy-arrow left" />
+              <div className="tennis-joy-track" />
+              <span
+                className="tennis-joy-stick"
+                style={{ transform: `translate(${joystickVisual.x * 30}px, ${joystickVisual.y * 30}px)` }}
+              >
+                <b />
+              </span>
             </div>
           </div>
         </section>

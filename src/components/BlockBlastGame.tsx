@@ -54,10 +54,10 @@ type FloatingScore = {
 
 type DragPreview = {
   pieceIndex: number;
-  x: number;
-  y: number;
   startX: number;
   startY: number;
+  grabX: number;
+  grabY: number;
 };
 
 const STORAGE_GAME = 'planify_block_blast_game';
@@ -201,17 +201,6 @@ function hasMove(board: Board, tray: Array<BlockPiece | null>) {
   });
 }
 
-function parseGame(raw: string | null): BlockSave | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as BlockSave;
-    if (Array.isArray(parsed.board) && parsed.board.length === CELL_COUNT && Array.isArray(parsed.tray)) return parsed;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): BlockStats {
   if (!raw) return emptyStats;
   try {
@@ -225,11 +214,6 @@ function parseStats(raw: string | null): BlockStats {
   } catch {
     return emptyStats;
   }
-}
-
-function coerceGame(value: unknown): BlockSave | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
 }
 
 function coerceStats(value: unknown): BlockStats {
@@ -265,7 +249,7 @@ function PiecePreview({ piece, compact = false }: { piece: BlockPiece; compact?:
 
 export function BlockBlastGame({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<BlockStats>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
-  const [game, setGame] = useState<BlockSave>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? createGame('endless'));
+  const [game, setGame] = useState<BlockSave>(() => createGame('endless'));
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
   const [preview, setPreview] = useState<number[]>([]);
@@ -275,6 +259,7 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
   const [completion, setCompletion] = useState(false);
   const [started, setStarted] = useState(false);
   const lastSyncRef = useRef(0);
+  const boardRef = useRef<HTMLDivElement | null>(null);
 
   const activePieceIndex = dragPreview?.pieceIndex ?? selectedPiece;
   const activePiece = activePieceIndex === null ? null : game.tray[activePieceIndex];
@@ -293,9 +278,7 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
     if (error || !data) return;
     const row = data as BlockRow;
     const cloudStats = coerceStats(row.stats);
-    const cloudGame = coerceGame(row.current_game);
     setStats(cloudStats);
-    if (cloudGame && !cloudGame.gameOver) setGame(cloudGame);
   }, []);
 
   useEffect(() => { loadCloud(); }, [loadCloud]);
@@ -460,27 +443,49 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
     placePiece(selectedPiece, index);
   }
 
-  function boardIndexFromPoint(x: number, y: number) {
-    const target = document.elementFromPoint(x, y) as HTMLElement | null;
-    const cell = target?.closest('.block-cell') as HTMLElement | null;
-    const index = Number(cell?.dataset.boardIndex);
-    return Number.isFinite(index) ? index : null;
+  function boardMetrics() {
+    const board = boardRef.current;
+    if (!board) return null;
+    const rect = board.getBoundingClientRect();
+    const styles = window.getComputedStyle(board);
+    const gap = Number.parseFloat(styles.columnGap) || 0;
+    const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
+    const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+    const cell = (rect.width - paddingLeft - paddingRight - gap * (SIZE - 1)) / SIZE;
+    return { rect, gap, paddingLeft, paddingTop, cell };
   }
 
-  function centeredOrigin(piece: BlockPiece, boardIndex: number) {
+  function ghostSize(piece: BlockPiece, cellSize: number, gap: number) {
     const bounds = pieceBounds(piece);
-    const row = Math.floor(boardIndex / SIZE) - Math.round((bounds.rows - 1) / 2);
-    const col = (boardIndex % SIZE) - Math.round((bounds.cols - 1) / 2);
-    return row * SIZE + col;
+    return {
+      width: bounds.cols * cellSize + (bounds.cols - 1) * gap,
+      height: bounds.rows * cellSize + (bounds.rows - 1) * gap,
+    };
   }
 
-  function updateDragPreview(piece: BlockPiece, x: number, y: number) {
-    const boardIndex = boardIndexFromPoint(x, y);
-    if (boardIndex === null) {
+  function updateDragPreview(piece: BlockPiece, x: number, y: number, grabX: number, grabY: number) {
+    const metrics = boardMetrics();
+    if (!metrics) {
       setPreview([]);
       return null;
     }
-    const origin = centeredOrigin(piece, boardIndex);
+    const step = metrics.cell + metrics.gap;
+    const size = ghostSize(piece, metrics.cell, metrics.gap);
+    const ghostLeft = x - grabX;
+    const ghostTop = y - grabY;
+    const overlapsBoard =
+      ghostLeft < metrics.rect.right &&
+      ghostLeft + size.width > metrics.rect.left &&
+      ghostTop < metrics.rect.bottom &&
+      ghostTop + size.height > metrics.rect.top;
+    if (!overlapsBoard) {
+      setPreview([]);
+      return null;
+    }
+    const col = Math.round((ghostLeft - metrics.rect.left - metrics.paddingLeft) / step);
+    const row = Math.round((ghostTop - metrics.rect.top - metrics.paddingTop) / step);
+    const origin = row * SIZE + col;
     setPreview(canPlace(game.board, piece, origin) ? placedIndexes(piece, origin) : []);
     return origin;
   }
@@ -490,8 +495,24 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelectedPiece(null);
-    setDragPreview({ pieceIndex, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY });
-    updateDragPreview(piece, event.clientX, event.clientY);
+    const metrics = boardMetrics();
+    const cellSize = metrics?.cell ?? 26;
+    const gap = metrics?.gap ?? 5;
+    const size = ghostSize(piece, cellSize, gap);
+    const shape = event.currentTarget.querySelector('.bb-piece-shape') as HTMLElement | null;
+    const shapeRect = shape?.getBoundingClientRect();
+    const ratioX = shapeRect ? (event.clientX - shapeRect.left) / shapeRect.width : 0.5;
+    const ratioY = shapeRect ? (event.clientY - shapeRect.top) / shapeRect.height : 0.5;
+    const grabX = Math.max(0, Math.min(1, ratioX)) * size.width;
+    const grabY = Math.max(0, Math.min(1, ratioY)) * size.height;
+    setDragPreview({
+      pieceIndex,
+      startX: event.clientX,
+      startY: event.clientY,
+      grabX,
+      grabY,
+    });
+    updateDragPreview(piece, event.clientX, event.clientY, grabX, grabY);
   }
 
   function movePieceDrag(event: PointerEvent<HTMLButtonElement>) {
@@ -499,26 +520,18 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
     const piece = game.tray[dragPreview.pieceIndex];
     if (!piece) return;
     event.preventDefault();
-    setDragPreview(current => current ? { ...current, x: event.clientX, y: event.clientY } : current);
-    updateDragPreview(piece, event.clientX, event.clientY);
+    updateDragPreview(piece, event.clientX, event.clientY, dragPreview.grabX, dragPreview.grabY);
   }
 
   function finishPieceDrag(event: PointerEvent<HTMLButtonElement>) {
     if (!dragPreview) return;
     const piece = game.tray[dragPreview.pieceIndex];
-    const distance = Math.hypot(event.clientX - dragPreview.startX, event.clientY - dragPreview.startY);
     if (!piece) {
       setDragPreview(null);
       setPreview([]);
       return;
     }
-    if (distance < 8) {
-      setSelectedPiece(current => current === dragPreview.pieceIndex ? null : dragPreview.pieceIndex);
-      setDragPreview(null);
-      setPreview([]);
-      return;
-    }
-    const origin = updateDragPreview(piece, event.clientX, event.clientY);
+    const origin = updateDragPreview(piece, event.clientX, event.clientY, dragPreview.grabX, dragPreview.grabY);
     if (origin !== null) placePiece(dragPreview.pieceIndex, origin);
     else showInvalid();
     setDragPreview(null);
@@ -564,7 +577,7 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
           </div>
 
           <div className="block-board-wrap">
-            <div className={`block-board-game${!started || game.paused ? ' is-muted' : ''}`} onDragLeave={() => setPreview([])}>
+            <div ref={boardRef} className={`block-board-game${!started || game.paused ? ' is-muted' : ''}`} onDragLeave={() => setPreview([])}>
               {game.board.map((cell, index) => (
                 <button
                   key={index}
@@ -639,11 +652,6 @@ export function BlockBlastGame({ onBack }: { onBack: () => void }) {
               </button>
             ))}
           </div>
-          {dragPreview && game.tray[dragPreview.pieceIndex] && (
-            <div className="block-drag-ghost" style={{ left: dragPreview.x, top: dragPreview.y }}>
-              <PiecePreview piece={game.tray[dragPreview.pieceIndex] as BlockPiece} />
-            </div>
-          )}
         </section>
       </main>
 

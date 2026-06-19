@@ -165,20 +165,6 @@ export function GamesPage() {
           <h3>Делай перерывы с пользой!</h3>
           <p>Короткая игра поможет снять напряжение и улучшить концентрацию.</p>
         </div>
-        <div className="games-hero-gamepad" aria-hidden="true">
-          <span className="hero-spark one" />
-          <span className="hero-spark two" />
-          <span className="hero-cube one" />
-          <span className="hero-cube two" />
-          <div className="hero-gamepad-body">
-            <i className="hero-cross">✚</i>
-            <i className="hero-stick left" />
-            <i className="hero-stick right" />
-            <i className="hero-dot one" />
-            <i className="hero-dot two" />
-            <i className="hero-dot three" />
-          </div>
-        </div>
       </section>
 
       <section className="games-grid" aria-label="Список игр">

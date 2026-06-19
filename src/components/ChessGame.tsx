@@ -92,17 +92,6 @@ function createSave(difficulty: Difficulty = 'medium', personality: Personality 
   };
 }
 
-function parseGame(raw: string | null): ChessSave | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as ChessSave;
-    if (parsed.fen && parsed.difficulty && parsed.personality) return parsed;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 function parseStats(raw: string | null): ChessStats {
   if (!raw) return emptyStats;
   try {
@@ -110,11 +99,6 @@ function parseStats(raw: string | null): ChessStats {
   } catch {
     return emptyStats;
   }
-}
-
-function coerceGame(value: unknown): ChessSave | null {
-  if (!value) return null;
-  return parseGame(JSON.stringify(value));
 }
 
 function coerceStats(value: unknown): ChessStats {
@@ -245,7 +229,7 @@ function resultFromChess(chess: Chess): GameResult {
 
 export function ChessGame({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<ChessStats>(() => parseStats(localStorage.getItem(STORAGE_STATS)));
-  const [save, setSave] = useState<ChessSave>(() => parseGame(localStorage.getItem(STORAGE_GAME)) ?? createSave());
+  const [save, setSave] = useState<ChessSave>(() => createSave());
   const [selected, setSelected] = useState<Square | null>(null);
   const [thinking, setThinking] = useState(false);
   const [syncState, setSyncState] = useState<'saved' | 'saving' | 'offline'>('saved');
@@ -277,9 +261,7 @@ export function ChessGame({ onBack }: { onBack: () => void }) {
     const { data, error } = await supabase.from('chess_progress').select('current_game, stats').eq('user_id', userId).maybeSingle();
     if (error || !data) return;
     const row = data as ChessRow;
-    const cloudGame = coerceGame(row.current_game);
     const cloudStats = coerceStats(row.stats);
-    if (cloudGame && !cloudGame.result) setSave(cloudGame);
     setStats(cloudStats);
   }, []);
 
