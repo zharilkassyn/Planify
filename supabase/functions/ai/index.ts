@@ -18,6 +18,13 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type AiAttachment = {
+  name?: string;
+  mimeType?: string;
+  data?: string;
+  text?: string;
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -25,9 +32,26 @@ Deno.serve(async (req) => {
     if (!GEMINI_API_KEY) {
       throw new Error('Нет GEMINI_API_KEY. Поставь секрет: npm run ai:secret -- GEMINI_API_KEY=...');
     }
-    const { prompt, system, mode } = await req.json();
+    const { prompt, system, mode, attachments } = await req.json();
     if (!prompt) throw new Error('Нужно поле prompt');
     const isImageMode = mode === 'image';
+    const attachmentParts = Array.isArray(attachments)
+      ? attachments.flatMap((file: AiAttachment) => {
+        const label = file.name ? `\n\nПрикреплённый файл: ${file.name}` : '\n\nПрикреплённый файл';
+        if (file.text) {
+          return [{ text: `${label}\n${file.text}` }];
+        }
+        if (file.data && file.mimeType) {
+          return [
+            { text: label },
+            { inlineData: { mimeType: file.mimeType, data: file.data } },
+          ];
+        }
+        return file.name || file.mimeType
+          ? [{ text: `${label} (${file.mimeType ?? 'unknown type'})` }]
+          : [];
+      })
+      : [];
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${isImageMode ? IMAGE_MODEL : MODEL}:generateContent`,
@@ -39,7 +63,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           systemInstruction: system ? { parts: [{ text: system }] } : undefined,
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: prompt }, ...attachmentParts] }],
           generationConfig: isImageMode
             ? {
               temperature: 0.72,

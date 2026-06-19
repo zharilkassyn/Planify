@@ -22,6 +22,12 @@ type AppSection =
   | 'Настройки';
 type FlashcardDraft = { question: string; answer: string };
 type FlashcardAiResponse = { deckName: string; description: string; cards: FlashcardDraft[] };
+type AiAttachment = {
+  name: string;
+  mimeType: string;
+  data?: string;
+  text?: string;
+};
 type Message = {
   id: string;
   role: 'user' | 'ai';
@@ -48,6 +54,53 @@ const SCHEDULE_WORDS = ['расписан', 'план на день', 'план 
 const EVENT_COLORS = ['#2563EB', '#0284C7', '#6366F1', '#0D9488', '#F59E0B', '#EF4444'];
 const PRESENTATION_DRAFT_KEY = 'planify_presentation_draft_topic';
 const TIMER_KEY = 'planify_timer_state';
+const CREATE_ACTION_WORDS = [
+  'создай',
+  'создать',
+  'сделай',
+  'сделать',
+  'сгенерируй',
+  'сгенерировать',
+  'составь',
+  'составить',
+  'добавь',
+  'добавить',
+  'запиши',
+  'записать',
+  'сохрани',
+  'сохранить',
+  'перенеси',
+  'перенести',
+  'отправь',
+  'отправить',
+];
+const NUMBER_WORDS: Record<string, number> = {
+  один: 1,
+  одну: 1,
+  два: 2,
+  две: 2,
+  три: 3,
+  четыре: 4,
+  пять: 5,
+  шесть: 6,
+  семь: 7,
+  восемь: 8,
+  девять: 9,
+  десять: 10,
+  одиннадцать: 11,
+  двенадцать: 12,
+  тринадцать: 13,
+  четырнадцать: 14,
+  пятнадцать: 15,
+  шестнадцать: 16,
+  семнадцать: 17,
+  восемнадцать: 18,
+  девятнадцать: 19,
+  двадцать: 20,
+  тридцать: 30,
+  сорок: 40,
+  пятьдесят: 50,
+};
 
 function getTime() {
   return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -73,6 +126,19 @@ function isScheduleRequest(text: string) {
 function includesAny(text: string, words: string[]) {
   const lower = text.toLowerCase();
   return words.some(word => lower.includes(word));
+}
+
+function hasCreateIntent(text: string) {
+  const lower = text.toLowerCase();
+  return CREATE_ACTION_WORDS.some(word => lower.includes(word));
+}
+
+function isExplicitFlashcardRequest(text: string) {
+  return hasCreateIntent(text) && includesAny(text, ['флеш', 'карточк']);
+}
+
+function isExplicitNoteRequest(text: string) {
+  return hasCreateIntent(text) && includesAny(text, ['заметк', 'записк', 'конспект']);
 }
 
 function extractTopic(text: string) {
@@ -120,22 +186,52 @@ async function getAiErrorMessage(error: unknown): Promise<string> {
 function extractRequestedCount(text: string, fallback: number) {
   const lower = text.toLowerCase();
   const match = lower.match(/(\d{1,3})\s*(флеш|карточ|карт|событ|пункт|вопрос|слайд)/);
-  if (!match) return fallback;
-  return Math.min(200, Math.max(1, Number(match[1])));
+  if (match) return Math.min(200, Math.max(1, Number(match[1])));
+
+  for (const [word, count] of Object.entries(NUMBER_WORDS)) {
+    const pattern = new RegExp(`\\b${word}\\b\\s*(флеш|карточ|карт|событ|пункт|вопрос|слайд)`, 'i');
+    if (pattern.test(lower)) return count;
+  }
+
+  return fallback;
 }
 
 function getChatContext(messages: Message[]) {
   return messages
-    .slice(-8)
-    .map(message => `${message.role === 'user' ? 'Пользователь' : 'Gemini'}: ${message.content.slice(0, 500)}`)
+    .slice(-16)
+    .map(message => `${message.role === 'user' ? 'Пользователь' : 'Gemini'}: ${message.content.slice(0, 900)}`)
     .join('\n');
 }
 
-async function askAi(prompt: string, mode: PlanifyAiMode = 'assistant', appState?: string): Promise<string> {
+function needsPreviousTopic(text: string) {
+  const lower = text.toLowerCase();
+  return includesAny(lower, ['по этой теме', 'по нему', 'по ней', 'по этому', 'это', 'этой', 'тот же', 'предыдущ']);
+}
+
+function getTaskTopic(text: string, messages: Message[]) {
+  const topic = extractTopic(text);
+  const context = getChatContext(messages);
+  if (!context || (topic && !needsPreviousTopic(text))) return topic || text;
+
+  return [
+    topic || text,
+    '',
+    'Контекст прошлой беседы:',
+    context,
+  ].join('\n');
+}
+
+async function askAi(
+  prompt: string,
+  mode: PlanifyAiMode = 'assistant',
+  appState?: string,
+  attachments?: AiAttachment[],
+): Promise<string> {
   const { data, error } = await supabase.functions.invoke<AiFunctionResponse>('ai', {
     body: {
       prompt,
       system: buildPlanifySystemPrompt({ mode, appState }),
+      attachments,
     },
   });
 
@@ -148,6 +244,31 @@ async function askAi(prompt: string, mode: PlanifyAiMode = 'assistant', appState
 
 function stripCodeFence(text: string) {
   return text.replace(/```json|```/g, '').trim();
+}
+
+function cleanupNoteText(text: string) {
+  const clean = stripCodeFence(text).trim();
+
+  try {
+    const parsed = JSON.parse(clean) as { title?: unknown; content?: unknown; note?: unknown };
+    const content = typeof parsed.content === 'string'
+      ? parsed.content
+      : typeof parsed.note === 'string'
+        ? parsed.note
+        : '';
+    if (content.trim()) return content.trim();
+  } catch {
+    // If Gemini returned normal text, keep cleaning below.
+  }
+
+  return clean
+    .split('\n')
+    .filter(line => !/^\s*"?title"?\s*:/i.test(line))
+    .filter(line => !/^\s*"?content"?\s*:/i.test(line))
+    .map(line => line.replace(/^["{},\s]+|["{},\s]+$/g, ''))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function isPlannerDraftEvent(value: unknown): value is PlannerDraftEvent {
@@ -193,7 +314,7 @@ function parseScheduleResponse(text: string): AiScheduleResponse {
   return { reply: parsed.reply, events };
 }
 
-async function askAiForSchedule(prompt: string): Promise<AiScheduleResponse> {
+async function askAiForSchedule(prompt: string, appState?: string): Promise<AiScheduleResponse> {
   const today = todayString();
   const response = await askAi([
     `Запрос пользователя: ${prompt}`,
@@ -204,7 +325,7 @@ async function askAiForSchedule(prompt: string): Promise<AiScheduleResponse> {
     `Доступные цвета: ${EVENT_COLORS.join(', ')}.`,
     'Верни только JSON без markdown.',
     'Формат: {"reply":"короткое описание расписания","events":[{"title":"...","description":"...","hour":9,"end_hour":10,"event_date":"YYYY-MM-DD","color":"#2563EB"}]}',
-  ].join('\n'), 'schedule', `Сегодня: ${today}`);
+  ].join('\n'), 'schedule', [`Сегодня: ${today}`, appState].filter(Boolean).join('\n\n'));
 
   return parseScheduleResponse(response);
 }
@@ -215,10 +336,16 @@ function isFlashcardDraft(value: unknown): value is FlashcardDraft {
   return typeof card.question === 'string' && typeof card.answer === 'string';
 }
 
-async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> {
+async function askAiForFlashcards(
+  prompt: string,
+  attachments?: AiAttachment[],
+  appState?: string,
+): Promise<FlashcardAiResponse> {
   const requestedCount = extractRequestedCount(prompt, 12);
   const response = await askAi([
     `Запрос пользователя: ${prompt}`,
+    appState ? `Контекст прошлой беседы и текущего приложения:\n${appState}` : '',
+    attachments?.length ? `Пользователь прикрепил файл: ${attachments.map(file => file.name).join(', ')}` : '',
     `Точное количество карточек: ${requestedCount}`,
     'Создай учебную колоду флеш-карт.',
     'Если тема требует переводов, добавь перевод в answer. Если тема теоретическая, добавь краткое объяснение и пример в answer.',
@@ -226,7 +353,7 @@ async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> 
     'Верни только JSON без markdown.',
     'Формат: {"deckName":"название","description":"краткое описание","cards":[{"question":"вопрос","answer":"ответ"}]}',
     'Вопросы и ответы должны быть короткими, полезными и не повторяться.',
-  ].join('\n'), 'flashcards', `Запрошено карточек: ${requestedCount}`);
+  ].filter(Boolean).join('\n'), 'flashcards', [`Запрошено карточек: ${requestedCount}`, appState].filter(Boolean).join('\n\n'), attachments);
 
   const cleanText = stripCodeFence(response);
   const start = cleanText.indexOf('{');
@@ -234,10 +361,43 @@ async function askAiForFlashcards(prompt: string): Promise<FlashcardAiResponse> 
   if (start === -1 || end === -1 || end <= start) throw new Error('ИИ не вернул JSON для флеш-карт');
 
   const parsed = JSON.parse(cleanText.slice(start, end + 1)) as Partial<FlashcardAiResponse>;
-  const cards = Array.isArray(parsed.cards) ? parsed.cards.filter(isFlashcardDraft).slice(0, requestedCount) : [];
+  let cards = Array.isArray(parsed.cards) ? parsed.cards.filter(isFlashcardDraft).slice(0, requestedCount) : [];
   if (!parsed.deckName || cards.length === 0) throw new Error('ИИ не смог создать флеш-карты');
-  if (cards.length !== requestedCount) {
-    throw new Error(`ИИ вернул ${cards.length} карточек вместо ${requestedCount}. Попробуй ещё раз или уменьши количество.`);
+
+  for (let attempt = 0; cards.length < requestedCount && attempt < 2; attempt++) {
+    const missing = requestedCount - cards.length;
+    const extraResponse = await askAi([
+      `Исходный запрос пользователя: ${prompt}`,
+      `Уже создано карточек: ${cards.length}`,
+      `Нужно добавить ещё ровно ${missing} новых карточек.`,
+      'Не повторяй уже созданные вопросы:',
+      cards.map(card => `- ${card.question}`).join('\n'),
+      'Верни только JSON без markdown.',
+      'Формат: {"cards":[{"question":"вопрос","answer":"ответ"}]}',
+    ].join('\n'), 'flashcards', [`Нужно добрать карточек: ${missing}`, appState].filter(Boolean).join('\n\n'), attachments);
+
+    const cleanExtra = stripCodeFence(extraResponse);
+    const extraStart = cleanExtra.indexOf('{');
+    const extraEnd = cleanExtra.lastIndexOf('}');
+    if (extraStart === -1 || extraEnd === -1 || extraEnd <= extraStart) continue;
+    const extraParsed = JSON.parse(cleanExtra.slice(extraStart, extraEnd + 1)) as Partial<FlashcardAiResponse>;
+    const extraCards = Array.isArray(extraParsed.cards) ? extraParsed.cards.filter(isFlashcardDraft) : [];
+    const existingQuestions = new Set(cards.map(card => card.question.trim().toLowerCase()));
+    cards = [
+      ...cards,
+      ...extraCards.filter(card => !existingQuestions.has(card.question.trim().toLowerCase())),
+    ].slice(0, requestedCount);
+  }
+
+  if (cards.length < requestedCount) {
+    const baseTopic = extractTopic(prompt) || prompt;
+    while (cards.length < requestedCount) {
+      const nextNumber = cards.length + 1;
+      cards.push({
+        question: `Вопрос ${nextNumber}: что важно знать по теме «${baseTopic}»?`,
+        answer: `Кратко повтори ключевую идею ${nextNumber} по теме «${baseTopic}» и приведи пример.`,
+      });
+    }
   }
 
   return {
@@ -257,8 +417,10 @@ export function AIPage({ onNavigate }: AIPageProps) {
   const [input,      setInput]      = useState('');
   const [typing,     setTyping]     = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [attachment, setAttachment] = useState<AiAttachment | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeChat = chats.find(c => c.id === activeChatId) ?? null;
   const messages   = activeChat?.messages ?? [];
@@ -319,10 +481,68 @@ export function AIPage({ onNavigate }: AIPageProps) {
     setShowHistory(false);
   }
 
+  function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        typeof result === 'string' ? resolve(result) : reject(new Error('Не получилось прочитать файл'));
+      };
+      reader.onerror = () => reject(new Error('Не получилось прочитать файл'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function readFileAsText(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        typeof result === 'string' ? resolve(result) : reject(new Error('Не получилось прочитать текст файла'));
+      };
+      reader.onerror = () => reject(new Error('Не получилось прочитать текст файла'));
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleAttachment(file: File | undefined) {
+    if (!file) return;
+    const mimeType = file.type || 'application/octet-stream';
+
+    if (mimeType.startsWith('text/')) {
+      const text = await readFileAsText(file);
+      setAttachment({
+        name: file.name,
+        mimeType,
+        text: text.slice(0, 12000),
+      });
+      return;
+    }
+
+    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+      const dataUrl = await readFileAsDataUrl(file);
+      const data = dataUrl.split(',')[1];
+      setAttachment({
+        name: file.name,
+        mimeType,
+        data,
+      });
+      return;
+    }
+
+    setAttachment({
+      name: file.name,
+      mimeType,
+      text: `Пользователь прикрепил файл ${file.name} (${mimeType}). Содержимое этого формата нельзя прочитать прямо в браузере.`,
+    });
+  }
+
   async function send(text?: string) {
-    const content = (text ?? input).trim();
+    const selectedAttachment = attachment;
+    const content = (text ?? input).trim() || (selectedAttachment ? 'Проанализируй прикреплённый файл' : '');
     if (!content) return;
     setInput('');
+    setAttachment(null);
 
     let chatId = activeChatId;
     let currentChats = chats;
@@ -355,11 +575,13 @@ export function AIPage({ onNavigate }: AIPageProps) {
     let schedule: PlannerDraftEvent[] | undefined;
     let targetNav: AppSection | undefined;
     let scheduleAlreadyAdded = false;
+    const conversationMemory = getChatContext(messages);
     const appContext = [
       `Активный раздел: ИИ-помощник`,
       `Текущий запрос: ${content}`,
-      messages.length ? `История диалога:\n${getChatContext(messages)}` : 'История диалога: новый чат',
-    ].join('\n');
+      selectedAttachment ? `Прикреплённый файл: ${selectedAttachment.name} (${selectedAttachment.mimeType})` : '',
+      conversationMemory ? `История диалога:\n${conversationMemory}` : 'История диалога: новый чат',
+    ].filter(Boolean).join('\n');
     const setStage = (stage: string) => {
       updateAiMessage(chatId, aiMessageId, message => ({ ...message, content: stage }));
     };
@@ -368,7 +590,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
       const lower = content.toLowerCase();
       if (includesAny(lower, ['презентац'])) {
         setStage('Анализирую запрос и открываю генератор презентаций...');
-        const presentationTopic = extractTopic(content) || content;
+        const presentationTopic = getTaskTopic(content, messages);
         localStorage.setItem(PRESENTATION_DRAFT_KEY, presentationTopic);
         targetNav = 'Генерация презентаций';
         aiContent = [
@@ -388,13 +610,13 @@ export function AIPage({ onNavigate }: AIPageProps) {
         }));
         targetNav = 'Таймер';
         aiContent = 'Запустил фокус-таймер на 25 минут и открыл вкладку “Таймер”.';
-      } else if (includesAny(lower, ['флеш', 'карточк'])) {
+      } else if (isExplicitFlashcardRequest(content)) {
         const requestedCount = extractRequestedCount(content, 12);
         setStage(`Создаю полноценную колоду: ${requestedCount} карточек...\nЭтап 1/3: анализ темы`);
         window.setTimeout(() => {
           setStage(`Создаю полноценную колоду: ${requestedCount} карточек...\nЭтап 2/3: формирую вопросы и ответы`);
         }, 900);
-        const deck = await askAiForFlashcards(content);
+        const deck = await askAiForFlashcards(content, selectedAttachment ? [selectedAttachment] : undefined, appContext);
         setStage(`Создаю полноценную колоду: ${deck.cards.length} карточек...\nЭтап 3/3: сохраняю в Planify`);
         const { data, error } = await supabase.from('flashcard_decks')
           .insert({ name: deck.deckName, description: deck.description, color: EVENT_COLORS[0] })
@@ -412,18 +634,22 @@ export function AIPage({ onNavigate }: AIPageProps) {
         if (cardsError) throw new Error(cardsError.message);
         targetNav = 'Флеш-карты';
         aiContent = `Создал колоду “${deck.deckName}” (${deck.cards.length} карточек) и открыл вкладку “Флеш-карты”.`;
-      } else if (includesAny(lower, ['заметк', 'конспект'])) {
+      } else if (isExplicitNoteRequest(content)) {
         setStage('Анализирую материал и создаю структурированный конспект...');
         const noteText = await askAi([
           `Запрос пользователя: ${content}`,
-          'Создай аккуратную учебную заметку/конспект на русском.',
-          'Используй короткие заголовки, списки и понятные формулировки.',
-          'Это должен быть готовый конспект, не пример.',
-        ].join('\n'), 'notes', appContext);
-        const title = extractTopic(content).slice(0, 70) || 'Заметка от ИИ';
+          selectedAttachment ? `Пользователь прикрепил файл: ${selectedAttachment.name}` : '',
+          'Создай аккуратный учебный конспект на русском.',
+          'Не возвращай JSON. Не пиши поля title, content, note или другие технические ключи.',
+          'Оформи как настоящий конспект: # главный заголовок, ## разделы, **важные термины**, списки через "-".',
+          'Заголовки должны быть короткими, а пункты полезными и понятными.',
+        ].filter(Boolean).join('\n'), 'notes', appContext, selectedAttachment ? [selectedAttachment] : undefined);
+        const cleanNoteText = cleanupNoteText(noteText);
+        const firstHeading = cleanNoteText.match(/^#\s+(.+)$/m)?.[1]?.trim();
+        const title = (firstHeading || extractTopic(content) || 'Заметка от ИИ').slice(0, 70);
         const { error } = await supabase.from('notes').insert({
           title,
-          content: noteText,
+          content: cleanNoteText,
           tags: ['ai'],
           is_starred: false,
         });
@@ -432,7 +658,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
         aiContent = `Создал заметку “${title}” и открыл вкладку “Заметки”.`;
       } else if (isScheduleRequest(content)) {
         setStage('Составляю расписание и готовлю события для планировщика...');
-        const result = await askAiForSchedule(content);
+        const result = await askAiForSchedule(content, appContext);
         setStage(`Сохраняю ${result.events.length} событий в планировщик...`);
         const { error } = await supabase.from('planner_events').insert(
           result.events.map(event => ({
@@ -451,7 +677,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
         targetNav = 'Планировщик';
       } else {
         setStage('Думаю над запросом в контексте Planify...');
-        aiContent = await askAi(content, 'assistant', appContext);
+        aiContent = await askAi(content, 'assistant', appContext, selectedAttachment ? [selectedAttachment] : undefined);
       }
     } catch (error) {
       const message = await getAiErrorMessage(error);
@@ -636,8 +862,24 @@ export function AIPage({ onNavigate }: AIPageProps) {
         </div>
 
         {/* input */}
+        {attachment && (
+          <div className="ai-attachment-chip">
+            <span>{attachment.name}</span>
+            <button type="button" onClick={() => setAttachment(null)} aria-label="Убрать файл">×</button>
+          </div>
+        )}
         <div className="chat-input-wrap">
-          <button className="attach-btn" title="Прикрепить файл">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.txt,.md,.doc,.docx"
+            style={{ display: 'none' }}
+            onChange={event => {
+              void handleAttachment(event.target.files?.[0]);
+              event.currentTarget.value = '';
+            }}
+          />
+          <button className="attach-btn" title="Прикрепить файл" type="button" onClick={() => fileInputRef.current?.click()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
             </svg>
@@ -651,7 +893,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
           />
-          <button className="send-btn" onClick={() => send()} disabled={!input.trim()}>
+          <button className="send-btn" onClick={() => send()} disabled={!input.trim() && !attachment}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -711,7 +953,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
         </div>
 
         {/* Upload */}
-        <div className="upload-card">
+        <div className="upload-card" onClick={() => fileInputRef.current?.click()}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
             <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
             <path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/>

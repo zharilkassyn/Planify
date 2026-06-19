@@ -26,6 +26,30 @@ function preview(content: string) {
   return content.replace(/^#+\s/gm, '').replace(/\*\*/g, '').replace(/`/g, '').trim().slice(0, 90) || 'Нет содержимого';
 }
 
+function renderInline(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
+function renderNoteContent(content: string) {
+  const lines = content.split('\n');
+  return lines.map((line, index) => {
+    const clean = line.trim();
+    if (!clean) return <div key={index} className="ne-note-space" />;
+    if (clean.startsWith('### ')) return <h4 key={index}>{renderInline(clean.slice(4))}</h4>;
+    if (clean.startsWith('## ')) return <h3 key={index}>{renderInline(clean.slice(3))}</h3>;
+    if (clean.startsWith('# ')) return <h2 key={index}>{renderInline(clean.slice(2))}</h2>;
+    if (clean.startsWith('- ')) return <p key={index} className="ne-note-bullet">{renderInline(clean.slice(2))}</p>;
+    if (clean.startsWith('> ')) return <blockquote key={index}>{renderInline(clean.slice(2))}</blockquote>;
+    return <p key={index}>{renderInline(clean)}</p>;
+  });
+}
+
 export function NotesPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -46,6 +70,7 @@ export function NotesPage() {
   const [folderColor, setFolderColor] = useState(FOLDER_COLORS[0]);
   const [tagInput, setTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
+  const [editingContent, setEditingContent] = useState(false);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,6 +122,7 @@ export function NotesPage() {
     setEditContent(note.content);
     setEditTags(note.tags);
     setEditStarred(note.is_starred);
+    setEditingContent(false);
   }
 
   const autoSave = useCallback((note: Note, title: string, content: string, tags: string[], starred: boolean) => {
@@ -417,8 +443,22 @@ export function NotesPage() {
 
             {/* Editor */}
             <div className="ne-content-area">
-              <textarea className="ne-editor" value={editContent} onChange={e => onContent(e.target.value)}
-                placeholder={`Начни писать заметку...\n\n# Используй # для заголовков\n- и минус для списков\n> и > для цитат`}/>
+              {editingContent ? (
+                <textarea
+                  className="ne-editor"
+                  value={editContent}
+                  onChange={e => onContent(e.target.value)}
+                  onBlur={() => setEditingContent(false)}
+                  autoFocus
+                  placeholder={`Начни писать заметку...\n\n# Используй # для заголовков\n- и минус для списков\n> и > для цитат`}
+                />
+              ) : (
+                <div className="ne-rendered-note" onClick={() => setEditingContent(true)}>
+                  {editContent.trim() ? renderNoteContent(editContent) : (
+                    <p className="ne-rendered-placeholder">Начни писать заметку...</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Formatting hint */}

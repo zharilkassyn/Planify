@@ -35,12 +35,6 @@ export function PresentationPreview({
   return (
     <div className="presentation-preview">
       <div className="pres-preview-header">
-        <div>
-          <p className="pres-modal-title" style={{ textAlign: 'left', marginBottom: 4 }}>Предпросмотр презентации</p>
-          <p style={{ fontSize: 13, color: 'var(--soft)' }}>
-            «{topic}» · {slides.length} слайдов
-          </p>
-        </div>
         <div className="pres-download-wrap pres-download-inline">
           {downloadOpen && (
             <div className="pres-download-menu">

@@ -58,12 +58,9 @@ export async function generateSlideImages(
   slides: PresentationSlide[],
   getAiErrorMessage: (error: unknown) => Promise<string>,
 ) {
-  const result: PresentationSlide[] = [];
-
-  for (const slide of slides) {
+  async function generateOne(slide: PresentationSlide): Promise<PresentationSlide> {
     if (!slide.useImage) {
-      result.push(slide);
-      continue;
+      return slide;
     }
 
     try {
@@ -76,10 +73,18 @@ export async function generateSlideImages(
       });
       if (error) throw new Error(await getAiErrorMessage(error));
       if (data?.error) throw new Error(data.error);
-      result.push(data?.imageDataUrl ? { ...slide, imageDataUrl: data.imageDataUrl } : slide);
+      return data?.imageDataUrl ? { ...slide, imageDataUrl: data.imageDataUrl } : slide;
     } catch {
-      result.push(slide);
+      return slide;
     }
+  }
+
+  const result: PresentationSlide[] = [];
+  const batchSize = 3;
+
+  for (let i = 0; i < slides.length; i += batchSize) {
+    const batch = slides.slice(i, i + batchSize);
+    result.push(...await Promise.all(batch.map(generateOne)));
   }
 
   return result;

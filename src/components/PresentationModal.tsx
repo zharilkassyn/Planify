@@ -13,12 +13,20 @@ import { supabase } from '../lib/supabase';
 interface AiFunctionResponse { text?: string; error?: string; }
 type DownloadFormat = 'pdf' | 'pptx';
 
+export interface PresentationAttachment {
+  name: string;
+  type: string;
+  dataUrl: string;
+}
+
 interface Props {
   topic: string;
   selectedTemplate: SelectedTemplate | null;
   startMode: 'manual' | 'ai';
+  initialSlides?: PresentationSlide[];
+  attachment?: PresentationAttachment | null;
   onClose: () => void;
-  onDone: (title: string, slidesCount: number) => void;
+  onDone: (title: string, slidesCount: number, slides: PresentationSlide[]) => void;
 }
 
 type Step = 'settings' | 'aiPreparing' | 'planning' | 'structure' | 'building' | 'preview';
@@ -58,17 +66,20 @@ const BUILDING_STEPS = [
   'Готово! ✓',
 ];
 
-const STEP_DURATIONS = { planning: 1100, building: 950 };
+const STEP_DURATIONS = { planning: 450, building: 220 };
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
 
-export function PresentationModal({ topic, selectedTemplate, startMode, onClose, onDone }: Props) {
-  void startMode;
-  const [step, setStep]               = useState<Step>('settings');
-  const [slidesCount, setSlidesCount] = useState(10);
+export function PresentationModal({ topic, selectedTemplate, startMode, initialSlides, attachment, onClose, onDone }: Props) {
+  const [step, setStep]               = useState<Step>(
+    initialSlides?.length ? 'preview' : startMode === 'ai' ? 'aiPreparing' : 'settings',
+  );
+  const [slidesCount, setSlidesCount] = useState(initialSlides?.length || 10);
   const [informationLevel, setInformationLevel] = useState<InformationLevel>('standard');
   const [audience, setAudience] = useState<Audience>('school');
-  const [slides, setSlides]           = useState<PresentationSlide[]>([]);
+  const [slides, setSlides]           = useState<PresentationSlide[]>(initialSlides ?? []);
+  const [pendingAttachment, setPendingAttachment] = useState<PresentationAttachment | null>(attachment ?? null);
+  const [selectedAttachmentSlide, setSelectedAttachmentSlide] = useState(1);
   const [loadIdx, setLoadIdx]         = useState(0);
   const [aiNotice, setAiNotice]       = useState('');
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -89,6 +100,118 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
 
   function createSlides(count: number): PresentationSlide[] {
     return createFallbackSlides(topic, count, selectedTemplate, informationLevelRef.current, audienceRef.current);
+  }
+
+  function shorten(text: string, max: number) {
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  }
+
+  function buildSlideContentFromTitle(slide: PresentationSlide, nextTitle: string): PresentationSlide {
+    const cleanTitle = nextTitle.trim();
+    if (!cleanTitle) return { ...slide, title: nextTitle };
+
+    const topicTitle = topic.trim() || 'презентация';
+    const section = shorten(cleanTitle, 70);
+    const attachedFileLabel = slide.content.find(item => item.startsWith('Файл: '));
+    const generatedContent = [
+      shorten(`Главная идея раздела: ${section}`, 70),
+      shorten(`Ключевые факты и примеры по теме`, 70),
+      shorten(`Почему это важно для темы «${topicTitle}»`, 70),
+      'Короткий вывод для запоминания',
+    ];
+    const content = attachedFileLabel
+      ? [attachedFileLabel, ...generatedContent].slice(0, 4)
+      : generatedContent;
+    const visual = shorten(`Визуальная метафора для раздела «${section}»`, 90);
+    const visualPrompt = [
+      visual,
+      `Topic: ${topicTitle}`,
+      `Slide title: ${section}`,
+      `Layout: ${slide.layout}`,
+      selectedTemplate ? `Style: ${selectedTemplate.style}` : 'modern educational presentation style',
+      'clear presentation visual, no text labels, no watermark',
+    ].join(', ');
+
+    return {
+      ...slide,
+      title: nextTitle,
+      subtitle: shorten(`Что важно понять про раздел «${section}».`, 150),
+      content,
+      visual,
+      visualPrompt,
+      imageDataUrl: slide.imageDataUrl,
+      stats: content.slice(0, 3).map((item, index) => ({
+        value: String(index + 1),
+        label: item,
+      })),
+      comparison: {
+        leftTitle: 'Главное',
+        left: content.slice(0, 2),
+        rightTitle: 'Важно учесть',
+        right: content.slice(2, 4),
+      },
+      timeline: content.map((item, index) => ({
+        label: `Шаг ${index + 1}`,
+        text: item,
+      })),
+      quote: shorten(`«${section}» помогает лучше раскрыть тему презентации.`, 160),
+      attribution: topicTitle,
+    };
+  }
+
+  function addAttachmentToSlide(slide: PresentationSlide, file: PresentationAttachment): PresentationSlide {
+    const isImage = file.type.startsWith('image/');
+    const fileLabel = `Файл: ${file.name}`;
+    const content = [
+      fileLabel,
+      ...slide.content.filter(item => item !== fileLabel),
+    ].slice(0, 4);
+
+    return {
+      ...slide,
+      layout: 'text-image',
+      content,
+      visual: isImage ? `Загруженное изображение: ${file.name}` : `Загруженный документ: ${file.name}`,
+      visualPrompt: isImage
+        ? `User uploaded image for slide "${slide.title}": ${file.name}`
+        : `User uploaded document for slide "${slide.title}": ${file.name}`,
+      useImage: isImage ? true : slide.useImage,
+      imageDataUrl: isImage ? file.dataUrl : slide.imageDataUrl,
+      stats: content.slice(0, 3).map((item, index) => ({
+        value: index === 0 ? 'FILE' : String(index + 1),
+        label: item,
+      })),
+      timeline: content.map((item, index) => ({
+        label: index === 0 ? 'Файл' : `Шаг ${index + 1}`,
+        text: item,
+      })),
+    };
+  }
+
+  function applyPendingAttachment() {
+    if (!pendingAttachment) return;
+    setSlides(currentSlides => currentSlides.map(slide => (
+      slide.id === selectedAttachmentSlide
+        ? addAttachmentToSlide(slide, pendingAttachment)
+        : slide
+    )));
+    setPendingAttachment(null);
+  }
+
+  function startBuildingPresentation() {
+    if (!pendingAttachment) {
+      setStep('building');
+      return;
+    }
+
+    const nextSlides = slides.map(slide => (
+      slide.id === selectedAttachmentSlide
+        ? addAttachmentToSlide(slide, pendingAttachment)
+        : slide
+    ));
+    setSlides(nextSlides);
+    setPendingAttachment(null);
+    setStep('building');
   }
 
   function getResponseContext(error: unknown): Response | null {
@@ -141,7 +264,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       } else if (stage === AI_PREP_STEPS.length) {
         clearInterval(id);
       }
-    }, 950);
+    }, 450);
 
     createSlidesWithAi(slidesCountRef.current)
       .catch(async error => {
@@ -156,7 +279,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
           setLoadIdx(AI_PREP_STEPS.length - 1);
           setSlides(generated);
           setStep('structure');
-        }, Math.max(650, (AI_PREP_STEPS.length - stage) * 700));
+        }, Math.max(180, (AI_PREP_STEPS.length - stage) * 260));
       });
 
     return () => {
@@ -189,7 +312,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
       .then(generated => {
         setSlides(generated);
         setLoadIdx(PLANNING_STEPS.length - 1);
-        setTimeout(() => setStep('structure'), 500);
+        setTimeout(() => setStep('structure'), 150);
       });
 
     return () => clearInterval(id);
@@ -208,8 +331,8 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
         clearInterval(id);
         setTimeout(() => {
           setStep('preview');
-          onDoneRef.current(topic, slidesCountRef.current);
-        }, 500);
+          onDoneRef.current(topic, slidesCountRef.current, slides);
+        }, 120);
       }
     }, STEP_DURATIONS.building);
     return () => clearInterval(id);
@@ -218,6 +341,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
   function updateSlide(id: number, field: 'title' | 'subtitle' | 'content' | 'visualPrompt', value: string) {
     setSlides(s => s.map(sl => {
       if (sl.id !== id) return sl;
+      if (field === 'title') return buildSlideContentFromTitle(sl, value);
       if (field === 'content') {
         return {
           ...sl,
@@ -329,6 +453,12 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
         {/* Top actions */}
         <div className={`pres-top-actions${step === 'preview' ? ' preview' : ''}`}>
           {step === 'preview' && (
+            <div className="pres-preview-top-title">
+              <p className="pres-modal-title">Предпросмотр презентации</p>
+              <span>«{topic}» · {slides.length} слайдов</span>
+            </div>
+          )}
+          {step === 'preview' && (
             <div className="pres-download-wrap">
               <button className="pres-download-main" onClick={() => setDownloadOpen(v => !v)}>
                 Скачать
@@ -342,10 +472,8 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
               )}
             </div>
           )}
-          <button className="pres-close" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+          <button className="pres-close" onClick={onClose} aria-label="Закрыть презентацию">
+            <span aria-hidden="true">×</span>
           </button>
         </div>
 
@@ -513,6 +641,28 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
             </p>
             {aiNotice && <p className="pres-ai-notice structure">{aiNotice}</p>}
 
+            {pendingAttachment && (
+              <div className="pres-attachment-picker">
+                <div>
+                  <strong>{pendingAttachment.name}</strong>
+                  <span>Выбери слайд, куда добавить файл</span>
+                </div>
+                <select
+                  value={selectedAttachmentSlide}
+                  onChange={event => setSelectedAttachmentSlide(Number(event.target.value))}
+                >
+                  {slides.map(slide => (
+                    <option key={slide.id} value={slide.id}>
+                      Слайд {slide.id}: {slide.title}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={applyPendingAttachment}>
+                  Добавить на слайд
+                </button>
+              </div>
+            )}
+
             {/* Slide cards — scrollable */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 2, marginBottom: 20 }}>
               {slides.map(sl => (
@@ -553,13 +703,19 @@ export function PresentationModal({ topic, selectedTemplate, startMode, onClose,
                       onChange={e => updateSlide(sl.id, 'visualPrompt', e.target.value)}
                       style={{ fontSize: 11, color: 'var(--soft)' }}
                     />
+                    {sl.imageDataUrl && (
+                      <div className="pres-slide-attachment-preview">
+                        <img src={sl.imageDataUrl} alt={`Фото для слайда ${sl.id}`} />
+                        <span>Фото добавлено на этот слайд</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
             <button
-              onClick={() => setStep('building')}
+              onClick={startBuildingPresentation}
               style={{
                 width: '100%', padding: '14px', borderRadius: 12,
                 border: 'none', background: primaryColor, color: '#fff',

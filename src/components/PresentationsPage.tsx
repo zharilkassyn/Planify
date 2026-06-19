@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { PresentationModal } from './PresentationModal';
+import { useEffect, useRef, useState } from 'react';
+import { PresentationModal, type PresentationAttachment } from './PresentationModal';
 import { TemplateGallery, PRESENTATION_TEMPLATES, type SelectedTemplate } from './TemplateGallery';
+import { createFallbackSlides } from './SlideBuilder';
+import type { PresentationSlide } from './LayoutSystem';
 
 const MAX_CHARS = 500;
 
@@ -69,6 +71,8 @@ interface Presentation {
   createdAt: number;
   fmt: string;
   bg: string;
+  slidesCount?: number;
+  slides?: PresentationSlide[];
   templateName?: string;
 }
 
@@ -139,11 +143,14 @@ export function PresentationsPage() {
   const [topic, setTopic]           = useState('');
   const [showModal, setShowModal]   = useState(false);
   const [modalStartMode, setModalStartMode] = useState<'manual' | 'ai'>('manual');
+  const [openedPresentation, setOpenedPresentation] = useState<Presentation | null>(null);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [menuOpen, setMenuOpen]     = useState<number | null>(null);
   const [recent, setRecent]         = useState<Presentation[]>(loadPresentations);
   const [selectedTemplate, setSelectedTemplate] = useState<SelectedTemplate | null>(loadSelectedTemplate);
+  const [uploadedAttachment, setUploadedAttachment] = useState<PresentationAttachment | null>(null);
   const [formError, setFormError]   = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563EB';
   const sidebarTemplates = PRESENTATION_TEMPLATES.slice(0, 4);
@@ -156,7 +163,63 @@ export function PresentationsPage() {
     localStorage.removeItem(PRESENTATION_DRAFT_KEY);
   }, []);
 
-  function handleModalDone(title: string, _count: number) {
+  function findTemplateByName(templateName: string | undefined): SelectedTemplate | null {
+    const template = PRESENTATION_TEMPLATES.find(item => item.templateName === templateName);
+    return template
+      ? {
+          templateName: template.templateName,
+          style: template.style,
+          colors: template.colors,
+        }
+      : null;
+  }
+
+  function getPresentationTemplate(presentation: Presentation | null): SelectedTemplate | null {
+    return findTemplateByName(presentation?.templateName) ?? selectedTemplate;
+  }
+
+  function getPresentationSlides(presentation: Presentation): PresentationSlide[] {
+    if (presentation.slides?.length) return presentation.slides;
+
+    return createFallbackSlides(
+      presentation.title,
+      presentation.slidesCount ?? 10,
+      getPresentationTemplate(presentation),
+      'standard',
+      'school',
+    );
+  }
+
+  function getSlidesForStorage(slides: PresentationSlide[]): PresentationSlide[] {
+    return slides.map(slide => {
+      if (!slide.imageDataUrl) return slide;
+      const copy = { ...slide };
+      delete copy.imageDataUrl;
+      return copy;
+    });
+  }
+
+  function handleModalDone(title: string, count: number, slides: PresentationSlide[]) {
+    const savedSlides = getSlidesForStorage(slides);
+
+    if (openedPresentation) {
+      const updated = recent.map(item => (
+        item.id === openedPresentation.id
+          ? {
+              ...item,
+              title,
+              slidesCount: count,
+              slides: savedSlides,
+              templateName: selectedTemplate?.templateName ?? item.templateName,
+            }
+          : item
+      ));
+      setRecent(updated);
+      savePresentations(updated);
+      setOpenedPresentation(null);
+      return;
+    }
+
     const newItem: Presentation = {
       id: String(Date.now()),
       title,
@@ -165,6 +228,8 @@ export function PresentationsPage() {
       bg: selectedTemplate
         ? `linear-gradient(135deg, ${selectedTemplate.colors.join(', ')})`
         : CARD_COLORS[recent.length % CARD_COLORS.length],
+      slidesCount: count,
+      slides: savedSlides,
       templateName: selectedTemplate?.templateName,
     };
     const updated = [newItem, ...recent];
@@ -179,14 +244,37 @@ export function PresentationsPage() {
     setMenuOpen(null);
   }
 
-  function handleNew() {
-    setTopic('');
-    setFormError('');
+  function handleOpen(presentation: Presentation) {
+    setOpenedPresentation(presentation);
+    setTopic(presentation.title);
+    setModalStartMode('manual');
+    setMenuOpen(null);
+    setShowModal(true);
   }
 
   function handleSelectTemplate(template: SelectedTemplate) {
     setSelectedTemplate(template);
     saveSelectedTemplate(template);
+  }
+
+  function handleFileUpload(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        setFormError('Не получилось прочитать файл');
+        return;
+      }
+      setUploadedAttachment({
+        name: file.name,
+        type: file.type || 'application/octet-stream',
+        dataUrl: result,
+      });
+      setFormError('');
+    };
+    reader.onerror = () => setFormError('Не получилось загрузить файл');
+    reader.readAsDataURL(file);
   }
 
   function startAiGeneration() {
@@ -195,6 +283,7 @@ export function PresentationsPage() {
       return;
     }
     setFormError('');
+    setOpenedPresentation(null);
     setModalStartMode('ai');
     setShowModal(true);
   }
@@ -205,6 +294,7 @@ export function PresentationsPage() {
       return;
     }
     setFormError('');
+    setOpenedPresentation(null);
     setModalStartMode('manual');
     setShowModal(true);
   }
@@ -222,20 +312,6 @@ export function PresentationsPage() {
               Создавай профессиональные презентации с помощью ИИ за секунды
             </p>
           </div>
-          <button
-            onClick={handleNew}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: primaryColor, color: '#fff', border: 'none',
-              borderRadius: 12, padding: '10px 18px', fontWeight: 700,
-              fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Новая презентация
-          </button>
         </div>
 
         {/* How it works */}
@@ -328,12 +404,26 @@ export function PresentationsPage() {
 
           {/* Buttons */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <button style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '9px 16px', borderRadius: 10,
-              border: '1.5px solid var(--border)', background: 'var(--card)',
-              color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt,.rtf,.ppt,.pptx"
+              style={{ display: 'none' }}
+              onChange={event => {
+                handleFileUpload(event.target.files?.[0]);
+                event.currentTarget.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 10,
+                border: '1.5px solid var(--border)', background: 'var(--card)',
+                color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
@@ -374,6 +464,15 @@ export function PresentationsPage() {
           </div>
 
           {formError && <p className="presentation-form-error">{formError}</p>}
+
+          {uploadedAttachment && (
+            <div className="selected-template-chip">
+              <span>Файл выбран: {uploadedAttachment.name}</span>
+              <button type="button" onClick={() => setUploadedAttachment(null)}>
+                Убрать
+              </button>
+            </div>
+          )}
 
           {selectedTemplate && (
             <div className="selected-template-chip">
@@ -470,11 +569,17 @@ export function PresentationsPage() {
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10,
                       overflow: 'hidden', minWidth: 140,
                     }}
-                      onClick={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
                     >
                       {['Открыть', 'Скачать'].map(action => (
                         <button key={action}
-                          onClick={() => setMenuOpen(null)}
+                          onClick={() => {
+                            if (action === 'Открыть') {
+                              handleOpen(r);
+                            } else {
+                              setMenuOpen(null);
+                            }
+                          }}
                           style={{
                             display: 'block', width: '100%', textAlign: 'left',
                             padding: '9px 14px', border: 'none', background: 'transparent',
@@ -595,11 +700,17 @@ export function PresentationsPage() {
       {showModal && (
         <PresentationModal
           topic={topic}
-          selectedTemplate={selectedTemplate}
+          selectedTemplate={getPresentationTemplate(openedPresentation)}
           startMode={modalStartMode}
-          onClose={() => setShowModal(false)}
-          onDone={(title, count) => {
-            handleModalDone(title, count);
+          initialSlides={openedPresentation ? getPresentationSlides(openedPresentation) : undefined}
+          attachment={openedPresentation ? null : uploadedAttachment}
+          onClose={() => {
+            setShowModal(false);
+            setOpenedPresentation(null);
+          }}
+          onDone={(title, count, slides) => {
+            handleModalDone(title, count, slides);
+            setUploadedAttachment(null);
           }}
         />
       )}

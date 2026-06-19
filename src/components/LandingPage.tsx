@@ -1,8 +1,23 @@
 import { useState } from 'react';
 import { Auth } from './Auth';
 
+const LAND_FEATURES = [
+  { icon: '📅', title: 'Планировщик', desc: 'Создавай расписания, ставь приоритеты и держи учебный день под контролем.' },
+  { icon: '⏱', title: 'Фокус и концентрация', desc: 'Используй Pomodoro, настраивай таймер под себя и учись без перегруза.' },
+  { icon: '🃏', title: 'Флеш-карты', desc: 'Запоминай быстрее с карточками, повторениями и готовыми колодами от ИИ.' },
+  { icon: '📝', title: 'Заметки', desc: 'Пиши, структурируй и сохраняй важное в одном спокойном месте.' },
+  { icon: '🤖', title: 'ИИ-помощник', desc: 'Получай конспекты, объяснения, тесты, карточки и помощь по материалам.' },
+  { icon: '📊', title: 'Прогресс и аналитика', desc: 'Отслеживай рост, привычки и результаты каждый учебный день.' },
+];
+
 export function LandingPage() {
   const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+
+  function openAuth(mode: 'signin' | 'signup') {
+    setAuthMode(mode);
+    setShowAuth(true);
+  }
 
   return (
     <div className="land-root" style={{
@@ -15,7 +30,7 @@ export function LandingPage() {
       {showAuth && (
         <div className="modal-overlay" onClick={() => setShowAuth(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440 }}>
-            <Auth />
+            <Auth initialMode={authMode} />
           </div>
         </div>
       )}
@@ -24,60 +39,17 @@ export function LandingPage() {
       <header className="land-nav">
         <div className="land-nav-logo">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
-            <circle cx="12" cy="13" r="8"/>
-            <path d="M7 3A2 2 0 0110 1"/><path d="M14 1A2 2 0 0117 3"/>
-            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/>
+            <path d="M6 3h9l3 3v15H6z"/>
+            <path d="M15 3v4h4"/>
+            <line x1="9" y1="11" x2="16" y2="11"/>
+            <line x1="9" y1="15" x2="16" y2="15"/>
+            <line x1="9" y1="19" x2="13" y2="19"/>
           </svg>
           <span className="land-nav-brand">Planify</span>
         </div>
         <div className="land-nav-right">
-        <nav className="land-nav-links">
-          <div className="land-nav-dropdown">
-            <span className="land-nav-trigger">
-              Возможности
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-            </span>
-            <div className="land-nav-menu">
-              {[
-                { icon: '📅', title: 'Умное расписание', desc: 'Автоматическая сортировка уроков и внеклассных занятий. Больше не нужно держать всё в голове.' },
-                { icon: '⏱️', title: 'Фокус-таймер', desc: 'Научно доказанный метод для продуктивной работы. 25 минут интенсивной учебы + 5 минут отдыха, чтобы не перегореть.' },
-                { icon: '🤖', title: 'ИИ-помощник', desc: 'Твой личный тьютор. Попроси объяснить сложную тему, составить конспект или сгенерировать флеш-карточки.' },
-                { icon: '📊', title: 'Трекер прогресса', desc: 'Визуализация твоего успеха. Видь, сколько тем ты прошёл и на сколько процентов близок к цели.' },
-              ].map(item => (
-                <div key={item.title} className="land-nav-menu-item">
-                  <span className="land-nav-menu-icon">{item.icon}</span>
-                  <div>
-                    <div className="land-nav-menu-title">{item.title}</div>
-                    <div className="land-nav-menu-desc">{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="land-nav-dropdown">
-            <span className="land-nav-trigger">
-              Как это работает
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-            </span>
-            <div className="land-nav-menu" style={{ width: 400 }}>
-              {[
-                { step: '1', title: 'Добавь свои задачи', desc: 'Просто введи предметы, дедлайны или темы, которые нужно выучить сегодня.' },
-                { step: '2', title: 'Включи режим фокусировки', desc: 'Запусти Фокус-таймер, когда садишься за уроки. Мы уберём всё лишнее, чтобы ты не отвлекался.' },
-                { step: '3', title: 'Получай мгновенную помощь от ИИ', desc: 'Если застрял на задаче — нажми кнопку ИИ-помощника, чтобы получить подсказку или объяснение.' },
-                { step: '4', title: 'Анализируй результат', desc: 'Смотри, сколько времени ты уделил каждому предмету и как растёт твой уровень знаний.' },
-              ].map(item => (
-                <div key={item.step} className="land-nav-menu-item">
-                  <span className="land-nav-step">{item.step}</span>
-                  <div>
-                    <div className="land-nav-menu-title">{item.title}</div>
-                    <div className="land-nav-menu-desc">{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </nav>
-        <button className="land-btn-login" onClick={() => setShowAuth(true)}>Войти</button>
+        <button className="land-btn-register" onClick={() => openAuth('signup')}>Регистрация</button>
+        <button className="land-btn-login" onClick={() => openAuth('signin')}>Войти</button>
         </div>
       </header>
 
@@ -118,7 +90,7 @@ export function LandingPage() {
           </ul>
 
           <div className="land-cta-row">
-            <button className="land-btn-primary" onClick={() => setShowAuth(true)}>
+            <button className="land-btn-primary" onClick={() => openAuth('signup')}>
               Начать бесплатно →
             </button>
           </div>
@@ -137,7 +109,7 @@ export function LandingPage() {
             {/* Sidebar */}
             <div style={{width:150,flexShrink:0,background:'white',borderRight:'1px solid #E2E8F0',padding:'20px 12px',display:'flex',flexDirection:'column',gap:2}}>
               <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:18,padding:'0 4px'}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="13" x2="15" y2="16"/></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><line x1="9" y1="11" x2="16" y2="11"/><line x1="9" y1="15" x2="16" y2="15"/><line x1="9" y1="19" x2="13" y2="19"/></svg>
                 <span style={{fontSize:13,fontWeight:800,color:'#1E293B'}}>Planify</span>
               </div>
               {[
@@ -246,6 +218,65 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <main className="land-main">
+        <section className="land-section land-features-section" id="features">
+          <div className="land-section-head">
+            <div className="land-badge land-section-badge">Всё, что нужно для учёбы</div>
+            <h2>Твои цели. Твой план. Твой результат.</h2>
+            <p>Planify объединяет инструменты, чтобы ты мог сосредоточиться на главном — своём будущем.</p>
+          </div>
+
+          <div className="land-feature-grid">
+            {LAND_FEATURES.map(item => (
+              <article key={item.title} className="land-feature-card">
+                <div className="land-feature-card-icon">{item.icon}</div>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+              </article>
+            ))}
+          </div>
+
+        </section>
+
+        <section className="land-final-cta">
+          <div>
+            <h2>Готов учиться умнее?</h2>
+            <p>Присоединяйся к ученикам, которые уже строят спокойную систему учёбы вместе с Planify.</p>
+            <button className="land-btn-primary land-cta-white" onClick={() => openAuth('signup')}>
+              Начать бесплатно →
+            </button>
+          </div>
+          <div className="land-final-art" aria-hidden="true">
+            <div className="land-book-stack">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="land-clock-art">
+              <strong>25</strong>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="land-footer">
+        <div className="land-nav-logo land-footer-logo">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+            <path d="M6 3h9l3 3v15H6z"/>
+            <path d="M15 3v4h4"/>
+            <line x1="9" y1="11" x2="16" y2="11"/>
+            <line x1="9" y1="15" x2="16" y2="15"/>
+            <line x1="9" y1="19" x2="13" y2="19"/>
+          </svg>
+          <span className="land-nav-brand">Planify</span>
+        </div>
+        <nav>
+          <a href="#features">Возможности</a>
+          <button type="button" onClick={() => openAuth('signin')}>Войти</button>
+        </nav>
+        <span>© 2026 Planify. Все права защищены.</span>
+      </footer>
     </div>
   );
 }

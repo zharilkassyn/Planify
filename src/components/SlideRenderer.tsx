@@ -180,7 +180,11 @@ function VisualBlock({ slide, theme, large = false }: { slide: PresentationSlide
     <div
       className={`slide-visual-block${large ? ' large' : ''}${slide.imageDataUrl ? ' has-image' : ''}`}
       aria-label={slide.visualPrompt}
-      style={slide.imageDataUrl ? { backgroundImage: `url(${slide.imageDataUrl})` } : undefined}
+      style={slide.imageDataUrl ? {
+        backgroundImage: `url("${slide.imageDataUrl}")`,
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+      } : undefined}
     >
       <div className="slide-photo-haze" />
       <div className="slide-photo-subject">
