@@ -274,6 +274,10 @@ body { background: var(--bg); min-height: 100vh; }
   padding: 22px;
 }
 
+.progress-wide-widget {
+  grid-column: span 2;
+}
+
 .widget-title {
   font-size: 14px;
   font-weight: 600;
@@ -351,6 +355,16 @@ body { background: var(--bg); min-height: 100vh; }
   display: flex;
   align-items: center;
   gap: 20px;
+}
+
+.progress-wide-widget .progress-circle-wrap {
+  justify-content: center;
+  gap: 42px;
+  min-height: 154px;
+}
+
+.progress-wide-widget .progress-stats {
+  min-width: min(320px, 100%);
 }
 
 .progress-circle {
@@ -8835,6 +8849,16 @@ button.ghost {
     grid-template-columns: 1fr;
     gap: 12px;
     margin-bottom: 12px;
+  }
+
+  .progress-wide-widget {
+    grid-column: auto;
+  }
+
+  .progress-wide-widget .progress-circle-wrap {
+    justify-content: flex-start;
+    gap: 18px;
+    min-height: 0;
   }
 
   .games-header,

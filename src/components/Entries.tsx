@@ -3,11 +3,6 @@ import { supabase } from '../lib/supabase';
 
 type Entry = { id: string; title: string; completed: boolean; created_at: string };
 
-const TASK_COLORS = [
-  '#2563EB', '#6366F1', '#8B5CF6', '#EC4899',
-  '#EF4444', '#F59E0B', '#10B981', '#0D9488',
-];
-
 export function Entries({ userEmail, onNavigate }: { userEmail: string; onNavigate: (page: string) => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -126,25 +121,8 @@ export function Entries({ userEmail, onNavigate }: { userEmail: string; onNaviga
           <div className="timer-start">Открыть таймер →</div>
         </div>
 
-        {/* Schedule */}
-        <div className="widget">
-          <div className="widget-title">Мои задачи сегодня</div>
-          {entries.length === 0 ? (
-            <div className="schedule-empty">Задач нет. Добавь первую!</div>
-          ) : (
-            <div className="schedule-list">
-              {entries.slice(0, 5).map((e, i) => (
-                <div key={e.id} className="schedule-item">
-                  <div className="schedule-dot" style={{ background: TASK_COLORS[i % TASK_COLORS.length] }} />
-                  <span className="schedule-name">{e.title}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Progress */}
-        <div className="widget">
+        <div className="widget progress-wide-widget">
           <div className="widget-title">Прогресс</div>
           <div className="progress-circle-wrap">
             <div className="progress-circle">
