@@ -39,16 +39,7 @@ type Chat    = { id: string; title: string; time: string; messages: Message[] };
 type AiFunctionResponse = { text?: string; error?: string };
 type AiScheduleResponse = { reply: string; events: PlannerDraftEvent[] };
 
-const CAPABILITIES = [
-  { icon: '📷', color: '#2563EB', title: 'Конспекты из фото',   desc: 'Загрузи фото конспекта или учебника, и я сделаю структурированный конспект.' },
-  { icon: '🃏', color: '#0D9488', title: 'Флеш-карты',          desc: 'Создаю флеш-карты для лучшего запоминания.' },
-  { icon: '💡', color: '#F59E0B', title: 'Объяснение тем',      desc: 'Объясняю сложные темы простыми словами.' },
-  { icon: '❓', color: '#6366F1', title: 'Тесты и вопросы',     desc: 'Создаю тесты и вопросы для самопроверки.' },
-  { icon: '📅', color: '#0284C7', title: 'Планирование',        desc: 'Помогу составить план обучения и подготовки.' },
-  { icon: '❤️', color: '#EF4444', title: 'Мотивация',           desc: 'Поддержу и помогу не терять мотивацию!' },
-];
-
-const QUICK = ['Сделать конспект', 'Создать флеш-карты', 'Объяснить тему', 'Создать тест'];
+const QUICK = ['Сделать конспект', 'Создать флеш-карты', 'Объяснить тему', 'Создать тест', 'Создать план'];
 const SCHEDULE_WORDS = ['расписан', 'план на день', 'план на неделю', 'запланируй', 'добавь в планировщик'];
 const EVENT_COLORS = ['#2563EB', '#0284C7', '#6366F1', '#0D9488', '#F59E0B', '#EF4444'];
 const PRESENTATION_DRAFT_KEY = 'planify_presentation_draft_topic';
@@ -415,7 +406,6 @@ export function AIPage({ onNavigate }: AIPageProps) {
   const [activeChatId, setActiveChat] = useState<string | null>(chats[0]?.id ?? null);
   const [input,      setInput]      = useState('');
   const [typing,     setTyping]     = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [attachment, setAttachment] = useState<AiAttachment | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -477,7 +467,6 @@ export function AIPage({ onNavigate }: AIPageProps) {
     const updated = [chat, ...chats];
     commitChats(updated);
     setActiveChat(chat.id);
-    setShowHistory(false);
   }
 
   function readFileAsDataUrl(file: File): Promise<string> {
@@ -761,12 +750,6 @@ export function AIPage({ onNavigate }: AIPageProps) {
             <p style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>Ваш умный помощник для учёбы</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="ai-hdr-btn" onClick={() => setShowHistory(v => !v)}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              История чатов
-            </button>
             <button className="ai-hdr-btn" onClick={newChat}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -775,37 +758,6 @@ export function AIPage({ onNavigate }: AIPageProps) {
             </button>
           </div>
         </div>
-
-        {/* history dropdown */}
-        {showHistory && (
-          <div className="history-dropdown">
-            <div className="panel-header" style={{ padding: '12px 16px 8px' }}>
-              <span className="panel-title">История чатов</span>
-              <button style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }} onClick={newChat}>+ Новый</button>
-            </div>
-            {chats.length === 0 ? (
-              <div style={{ padding: '12px 16px', fontSize: 13, color: '#94A3B8' }}>Чатов пока нет</div>
-            ) : chats.map(c => (
-              <div key={c.id} className={`history-item${c.id === activeChatId ? ' active' : ''}`}
-                onClick={() => { setActiveChat(c.id); setShowHistory(false); }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#94A3B8' }}>
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-                </svg>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{c.title}</span>
-                <span style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0 }}>{c.time}</span>
-                <button className="recent-chat-delete" onClick={e => { e.stopPropagation(); deleteChat(c.id); }} aria-label="Удалить чат">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14H6L5 6"/>
-                    <path d="M10 11v6"/>
-                    <path d="M14 11v6"/>
-                    <path d="M9 6V4h6v2"/>
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* messages */}
         <div className="chat-area">
@@ -925,28 +877,10 @@ export function AIPage({ onNavigate }: AIPageProps) {
       {/* ── RIGHT ── */}
       <div className="ai-right">
 
-        {/* Capabilities */}
-        <div className="panel" style={{ padding: 18 }}>
-          <div className="panel-title" style={{ marginBottom: 14 }}>Что я умею</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {CAPABILITIES.map(c => (
-              <button key={c.title} className="cap-card" onClick={() => send(c.title)}>
-                <div className="cap-icon" style={{ background: c.color + '18', color: c.color }}>{c.icon}</div>
-                <div className="cap-title">{c.title}</div>
-                <div className="cap-desc">{c.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Recent chats */}
         <div className="panel ai-recent-panel">
           <div className="panel-header" style={{ marginBottom: 12 }}>
             <span className="panel-title">Недавние чаты</span>
-            {chats.length > 0 && (
-              <span style={{ fontSize: 12, color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
-                onClick={() => setShowHistory(true)}>Посмотреть все</span>
-            )}
           </div>
           {chats.length === 0 ? (
             <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>

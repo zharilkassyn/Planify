@@ -1,15 +1,6 @@
 import { useState } from 'react';
 import { Auth } from './Auth';
 
-const LAND_FEATURES = [
-  { icon: '📅', title: 'Планировщик', desc: 'Создавай расписания, ставь приоритеты и держи учебный день под контролем.' },
-  { icon: '⏱', title: 'Фокус и концентрация', desc: 'Используй Pomodoro, настраивай таймер под себя и учись без перегруза.' },
-  { icon: '🃏', title: 'Флеш-карты', desc: 'Запоминай быстрее с карточками, повторениями и готовыми колодами от ИИ.' },
-  { icon: '📝', title: 'Заметки', desc: 'Пиши, структурируй и сохраняй важное в одном спокойном месте.' },
-  { icon: '🤖', title: 'ИИ-помощник', desc: 'Получай конспекты, объяснения, тесты, карточки и помощь по материалам.' },
-  { icon: '📊', title: 'Статистика', desc: 'Отслеживай задачи, фокус-время и результаты каждый учебный день.' },
-];
-
 export function LandingPage() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -48,8 +39,7 @@ export function LandingPage() {
           <span className="land-nav-brand">Planify</span>
         </div>
         <div className="land-nav-right">
-        <button className="land-btn-register" onClick={() => openAuth('signup')}>Регистрация</button>
-        <button className="land-btn-login" onClick={() => openAuth('signin')}>Войти</button>
+          <button className="land-btn-login" onClick={() => openAuth('signin')}>Войти</button>
         </div>
       </header>
 
@@ -91,7 +81,7 @@ export function LandingPage() {
 
           <div className="land-cta-row">
             <button className="land-btn-primary" onClick={() => openAuth('signup')}>
-              Начать бесплатно →
+              Начать →
             </button>
           </div>
           <div className="land-trust">
@@ -219,42 +209,110 @@ export function LandingPage() {
       </section>
 
       <main className="land-main">
-        <section className="land-section land-features-section" id="features">
-          <div className="land-section-head">
-            <div className="land-badge land-section-badge">Всё, что нужно для учёбы</div>
-            <h2>Твои цели. Твой план. Твой результат.</h2>
-            <p>Planify объединяет инструменты, чтобы ты мог сосредоточиться на главном — своём будущем.</p>
+        <section className="land-section land-bento-section" id="features">
+          <div className="land-bento-heading">
+            <span>Возможности Planify</span>
+            <h2>Planify — это учебное пространство, где планирование, фокус и ИИ работают вместе.</h2>
           </div>
 
-          <div className="land-feature-grid">
-            {LAND_FEATURES.map(item => (
-              <article key={item.title} className="land-feature-card">
-                <div className="land-feature-card-icon">{item.icon}</div>
-                <h3>{item.title}</h3>
-                <p>{item.desc}</p>
-              </article>
-            ))}
-          </div>
+          <div className="land-bento-grid">
+            <article className="land-bento-card land-bento-card-wide land-bento-ai">
+              <div className="land-bento-copy">
+                <span className="land-bento-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 3l1.7 4.7L18 9.4l-4.3 1.7L12 16l-1.7-4.9L6 9.4l4.3-1.7L12 3z"/>
+                    <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z"/>
+                    <path d="M5 15l.7 1.8L7.5 17.5l-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z"/>
+                  </svg>
+                </span>
+                <h3>Персональный ИИ-помощник</h3>
+                <p>Создает конспекты, генерирует флеш-карты для запоминания и объясняет сложные темы простыми словами.</p>
+              </div>
+              <div className="land-ai-preview" aria-hidden="true">
+                <div className="land-ai-node land-ai-node-top" />
+                <div className="land-ai-node land-ai-node-mid" />
+                <div className="land-ai-node land-ai-node-low" />
+                <div className="land-ai-chat">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            </article>
 
-        </section>
+            <article className="land-bento-card land-bento-timer">
+              <div className="land-bento-copy">
+                <span className="land-bento-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="13" r="8"/>
+                    <path d="M12 9v4l3 2"/>
+                    <path d="M9 2h6"/>
+                  </svg>
+                </span>
+                <h3>Таймер фокуса</h3>
+                <p>Учись по методу Помодоро без выгорания.</p>
+              </div>
+              <div className="land-timer-preview" aria-hidden="true">
+                <svg width="118" height="118" viewBox="0 0 118 118">
+                  <circle cx="59" cy="59" r="45" fill="none" stroke="#DBEAFE" strokeWidth="10"/>
+                  <circle cx="59" cy="59" r="45" fill="none" stroke="#2563EB" strokeWidth="10" strokeDasharray="212 283" strokeLinecap="round"/>
+                </svg>
+                <div>
+                  <strong>25</strong>
+                  <span>мин</span>
+                </div>
+              </div>
+              <button type="button" className="land-timer-start">Старт</button>
+            </article>
 
-        <section className="land-final-cta">
-          <div>
-            <h2>Готов учиться умнее?</h2>
-            <p>Присоединяйся к ученикам, которые уже строят спокойную систему учёбы вместе с Planify.</p>
-            <button className="land-btn-primary land-cta-white" onClick={() => openAuth('signup')}>
-              Начать бесплатно →
-            </button>
-          </div>
-          <div className="land-final-art" aria-hidden="true">
-            <div className="land-book-stack">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="land-clock-art">
-              <strong>25</strong>
-            </div>
+            <article className="land-bento-card land-bento-flashcards">
+              <div className="land-bento-copy">
+                <span className="land-bento-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="4" y="5" width="14" height="16" rx="2"/>
+                    <path d="M8 3h10a2 2 0 0 1 2 2v12"/>
+                    <path d="M8 11h6"/>
+                    <path d="M8 15h4"/>
+                  </svg>
+                </span>
+                <h3>Флеш-карты</h3>
+                <p>Повторяй материал эффективно с помощью интервальных повторений.</p>
+              </div>
+              <div className="land-card-stack" aria-hidden="true">
+                <div className="land-study-card land-study-card-back" />
+                <div className="land-study-card land-study-card-mid" />
+                <div className="land-study-card land-study-card-front">
+                  <span>Термин</span>
+                  <strong>Активное повторение</strong>
+                </div>
+              </div>
+            </article>
+
+            <article className="land-bento-card land-bento-card-wide land-bento-analytics">
+              <div className="land-bento-copy">
+                <span className="land-bento-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 19V5"/>
+                    <path d="M4 19h16"/>
+                    <rect x="7" y="11" width="3" height="5" rx="1"/>
+                    <rect x="12" y="7" width="3" height="9" rx="1"/>
+                    <rect x="17" y="9" width="3" height="7" rx="1"/>
+                  </svg>
+                </span>
+                <h3>Трекер прогресса</h3>
+                <p>Наглядная статистика выполненных задач и времени в фокусе.</p>
+              </div>
+              <div className="land-analytics-preview" aria-hidden="true">
+                <div className="land-analytics-bars">
+                  {[38, 62, 48, 82, 70, 92].map((height, index) => (
+                    <span key={index} style={{ height: `${height}%` }} />
+                  ))}
+                </div>
+                <div className="land-analytics-progress">
+                  <span />
+                </div>
+              </div>
+            </article>
           </div>
         </section>
       </main>
