@@ -1,5 +1,89 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Auth } from './Auth';
+
+type RevealProps = {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+};
+
+const GAME_PREVIEWS = [
+  {
+    title: 'Судоку',
+    art: (
+      <div className="land-sudoku-board" aria-hidden="true">
+        {['5', '', '2', '', '9', '', '7', '', '4'].map((cell, index) => <span key={index}>{cell}</span>)}
+      </div>
+    ),
+  },
+  {
+    title: 'Шахматы',
+    art: (
+      <div className="land-chess-scene" aria-hidden="true">
+        <span className="chess-piece-main" />
+        <span className="chess-piece-shadow" />
+      </div>
+    ),
+  },
+  {
+    title: '2048',
+    art: (
+      <div className="land-tiles-2048" aria-hidden="true">
+        {['2', '4', '8', '16'].map(tile => <span key={tile}>{tile}</span>)}
+      </div>
+    ),
+  },
+  {
+    title: 'Теннис',
+    art: (
+      <div className="land-tennis-scene" aria-hidden="true">
+        <span className="tennis-court-line" />
+        <span className="tennis-racket" />
+        <span className="tennis-ball" />
+      </div>
+    ),
+  },
+];
+
+const WHY_CARDS = [
+  { title: 'Всё в одном месте', text: 'План, заметки, карточки, ИИ, статистика и игры не разбросаны по разным приложениям.' },
+  { title: 'Удобно каждый день', text: 'Интерфейс спокойно ведёт по учебному процессу и не мешает сосредоточиться.' },
+  { title: 'Современно', text: 'Мягкие блоки, понятные состояния и быстрые действия делают работу лёгкой.' },
+  { title: 'Красиво', text: 'Минималистичный визуальный стиль помогает учиться без визуального шума.' },
+];
+
+function Reveal({ children, className = '', delay = 0 }: RevealProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || visible) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.18, rootMargin: '0px 0px -80px 0px' },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <div
+      ref={ref}
+      className={`land-reveal${visible ? ' is-visible' : ''}${className ? ` ${className}` : ''}`}
+      style={{ '--reveal-delay': `${delay}ms` } as CSSProperties}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function LandingPage() {
   const [showAuth, setShowAuth] = useState(false);
@@ -54,8 +138,8 @@ export function LandingPage() {
           </div>
 
           <h1 className="land-headline">
-            Учись умнее,<br/>
-            <span className="land-headline-accent">а не дольше</span>
+            Каждый день<br/>
+            <span className="land-headline-accent">ближе к цели.</span>
           </h1>
 
           <p className="land-desc">
@@ -208,113 +292,239 @@ export function LandingPage() {
         </div>
       </section>
 
-      <main className="land-main">
-        <section className="land-section land-bento-section" id="features">
-          <div className="land-bento-heading">
-            <span>Возможности Planify</span>
-            <h2>Planify — это учебное пространство, где планирование, фокус и ИИ работают вместе.</h2>
-          </div>
+      <main className="land-main land-story-main">
+        <Reveal className="land-section land-story-intro" delay={80}>
+          <span className="land-story-kicker">Возможности Planify</span>
+          <h2>Все инструменты для учёбы в одном месте.</h2>
+        </Reveal>
 
-          <div className="land-bento-grid">
-            <article className="land-bento-card land-bento-card-wide land-bento-ai">
-              <div className="land-bento-copy">
-                <span className="land-bento-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 3l1.7 4.7L18 9.4l-4.3 1.7L12 16l-1.7-4.9L6 9.4l4.3-1.7L12 3z"/>
-                    <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z"/>
-                    <path d="M5 15l.7 1.8L7.5 17.5l-1.8.7L5 20l-.7-1.8-1.8-.7 1.8-.7L5 15z"/>
-                  </svg>
-                </span>
-                <h3>Персональный ИИ-помощник</h3>
-                <p>Создает конспекты, генерирует флеш-карты для запоминания и объясняет сложные темы простыми словами.</p>
+        <section className="land-feature-showcase-list" id="features">
+          <Reveal className="land-section land-showcase-panel land-showcase-planner">
+            <div className="land-showcase-copy">
+              <span>Планировщик</span>
+              <h2>Собери день в понятный учебный маршрут.</h2>
+              <p>Расписание, задачи и приоритеты выглядят как чистая карта дня: сразу видно, что делать сейчас и что будет дальше.</p>
+            </div>
+            <div className="land-product-frame land-planner-mock" aria-hidden="true">
+              <div className="land-mini-toolbar">
+                <strong>Сегодня</strong>
+                <span>5 задач</span>
               </div>
-              <div className="land-ai-preview" aria-hidden="true">
-                <div className="land-ai-node land-ai-node-top" />
-                <div className="land-ai-node land-ai-node-mid" />
-                <div className="land-ai-node land-ai-node-low" />
-                <div className="land-ai-chat">
-                  <span />
-                  <span />
-                  <span />
+              {[
+                ['09:00', 'Математика', 'Высокий'],
+                ['11:30', 'Английский', 'Средний'],
+                ['14:00', 'Физика', 'Высокий'],
+                ['16:30', 'Повторение', 'Лёгкий'],
+              ].map(([time, title, tag]) => (
+                <div key={title} className="land-plan-row">
+                  <span>{time}</span>
+                  <strong>{title}</strong>
+                  <i>{tag}</i>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+
+          <Reveal className="land-section land-showcase-panel land-showcase-notes" delay={120}>
+            <div className="land-product-frame land-notes-mock" aria-hidden="true">
+              <aside>
+                <span>Папки</span>
+                <b>Алгебра</b>
+                <b>История</b>
+                <b>Английский</b>
+              </aside>
+              <div>
+                <span>Заметка</span>
+                <h3>Учебный план на сегодня</h3>
+                <ul className="land-note-tasks">
+                  <li><b />Решить 12 задач по алгебре</li>
+                  <li><b />Повторить 25 новых слов</li>
+                  <li><b />Прочитать параграф по истории</li>
+                  <li><b />Сделать короткий конспект</li>
+                </ul>
+              </div>
+            </div>
+            <div className="land-showcase-copy">
+              <span>Заметки</span>
+              <h2>Материалы не теряются и остаются под рукой.</h2>
+              <p>Папки, история и редактор помогают быстро вернуться к теме, которую ты уже разбирал.</p>
+            </div>
+          </Reveal>
+
+          <Reveal className="land-section land-showcase-panel land-showcase-flashcards" delay={160}>
+            <div className="land-showcase-copy">
+              <span>Флешкарточки</span>
+              <h2>Повторение становится лёгким и визуальным.</h2>
+              <p>Карточки появляются как колода: термин, ответ и прогресс повторения собраны в одном месте.</p>
+            </div>
+            <div className="land-product-frame land-flashcards-mock" aria-hidden="true">
+              <div className="land-deck-card land-deck-card-back" />
+              <div className="land-deck-card land-deck-card-middle" />
+              <div className="land-deck-card land-deck-card-front">
+                <span>Формула</span>
+                <strong>Квадрат суммы</strong>
+                <p>(a + b)² = a² + 2ab + b²</p>
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal className="land-section land-showcase-panel land-showcase-presentations" delay={200}>
+            <div className="land-product-frame land-presentation-mock" aria-hidden="true">
+              <div className="land-process-step active">
+                <span>01</span>
+                <strong>Тема</strong>
+                <p>Космос и планеты</p>
+              </div>
+              <div className="land-process-line" />
+              <div className="land-process-step">
+                <span>02</span>
+                <strong>Генерация</strong>
+                <p>Структура и слайды</p>
+              </div>
+              <div className="land-slide-stack">
+                <div className="land-presentation-card land-presentation-card-back" />
+                <div className="land-presentation-card land-presentation-card-mid" />
+                <div className="land-presentation-card land-presentation-card-front">
+                  <div className="land-space-cover">
+                    <span className="land-space-planet" />
+                    <span className="land-space-orbit" />
+                    <span className="land-space-star star-one" />
+                    <span className="land-space-star star-two" />
+                    <span className="land-space-star star-three" />
+                  </div>
+                  <div className="land-slide-caption">
+                    <strong>Солнечная система</strong>
+                  </div>
                 </div>
               </div>
-            </article>
+            </div>
+            <div className="land-showcase-copy">
+              <span>Генерация презентаций</span>
+              <h2>От темы до готовой презентации за несколько шагов.</h2>
+              <p>Задай тему, дождись генерации структуры и получи аккуратный материал для выступления.</p>
+            </div>
+          </Reveal>
 
-            <article className="land-bento-card land-bento-timer">
-              <div className="land-bento-copy">
-                <span className="land-bento-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="13" r="8"/>
-                    <path d="M12 9v4l3 2"/>
-                    <path d="M9 2h6"/>
-                  </svg>
-                </span>
-                <h3>Таймер фокуса</h3>
-                <p>Учись по методу Помодоро без выгорания.</p>
+          <Reveal className="land-section land-showcase-panel land-showcase-ai" delay={240}>
+            <div className="land-showcase-copy">
+              <span>AI помощник</span>
+              <h2>Чат, который объясняет, сокращает и помогает думать.</h2>
+              <p>Пиши вопрос, проси конспект, тест, план или объяснение темы простыми словами.</p>
+            </div>
+            <div className="land-product-frame land-chat-mock" aria-hidden="true">
+              <div className="land-chat-bubble ai">Объясни тему простыми словами</div>
+              <div className="land-chat-bubble user">И добавь пример</div>
+              <div className="land-chat-bubble ai wide">Конечно. Начнём с идеи, потом разберём пример и сделаем короткий тест.</div>
+              <div className="land-chat-input">
+                <span>Спроси что-нибудь...</span>
+                <b>→</b>
               </div>
-              <div className="land-timer-preview" aria-hidden="true">
-                <svg width="118" height="118" viewBox="0 0 118 118">
-                  <circle cx="59" cy="59" r="45" fill="none" stroke="#DBEAFE" strokeWidth="10"/>
-                  <circle cx="59" cy="59" r="45" fill="none" stroke="#2563EB" strokeWidth="10" strokeDasharray="212 283" strokeLinecap="round"/>
-                </svg>
+            </div>
+          </Reveal>
+
+          <Reveal className="land-section land-games-section" delay={120}>
+            <div className="land-section-split-head">
+              <div>
+                <span>Игры</span>
+                <h2>Короткая пауза, которая не ломает учебный ритм.</h2>
+              </div>
+            </div>
+            <div className="land-games-scroll" aria-label="Список игр">
+              {GAME_PREVIEWS.map(game => (
+                <article key={game.title} className="land-game-tile">
+                  <div className="land-game-art">
+                    {game.art}
+                  </div>
+                  <strong>{game.title}</strong>
+                </article>
+              ))}
+            </div>
+          </Reveal>
+
+          <Reveal className="land-section land-showcase-panel land-showcase-stats" delay={160}>
+            <div className="land-showcase-copy">
+              <span>Статистика</span>
+              <h2>Видно, как растёт фокус и закрываются цели.</h2>
+              <p>Графики показывают выполненные задачи, время в фокусе и движение к результату без лишней сложности.</p>
+            </div>
+            <div className="land-product-frame land-stats-mock" aria-hidden="true">
+              <div className="land-stats-dashboard-head">
                 <div>
-                  <strong>25</strong>
-                  <span>мин</span>
+                  <span>Фокус за неделю</span>
+                  <strong>18ч 40м</strong>
                 </div>
+                <b>+24%</b>
               </div>
-              <button type="button" className="land-timer-start">Старт</button>
-            </article>
-
-            <article className="land-bento-card land-bento-flashcards">
-              <div className="land-bento-copy">
-                <span className="land-bento-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="4" y="5" width="14" height="16" rx="2"/>
-                    <path d="M8 3h10a2 2 0 0 1 2 2v12"/>
-                    <path d="M8 11h6"/>
-                    <path d="M8 15h4"/>
+              <div className="land-real-chart">
+                <div className="land-real-scale">
+                  <span>8ч</span>
+                  <span>6ч</span>
+                  <span>4ч</span>
+                  <span>2ч</span>
+                  <span>0ч</span>
+                </div>
+                <div className="land-real-plot">
+                  <svg viewBox="0 0 420 210" preserveAspectRatio="none">
+                    <path d="M0 26H420M0 72H420M0 118H420M0 164H420" className="land-stats-grid" />
+                    <path d="M16 158 C58 132 78 144 116 106 C160 62 184 88 224 70 C272 46 298 76 336 44 C366 20 386 34 408 26" className="land-stats-line" />
+                    <path d="M16 158 C58 132 78 144 116 106 C160 62 184 88 224 70 C272 46 298 76 336 44 C366 20 386 34 408 26 L408 198 L16 198 Z" className="land-stats-area" />
+                    <circle cx="116" cy="106" r="5" />
+                    <circle cx="224" cy="70" r="5" />
+                    <circle cx="336" cy="44" r="5" />
+                    <circle cx="408" cy="26" r="5" />
                   </svg>
-                </span>
-                <h3>Флеш-карты</h3>
-                <p>Повторяй материал эффективно с помощью интервальных повторений.</p>
-              </div>
-              <div className="land-card-stack" aria-hidden="true">
-                <div className="land-study-card land-study-card-back" />
-                <div className="land-study-card land-study-card-mid" />
-                <div className="land-study-card land-study-card-front">
-                  <span>Термин</span>
-                  <strong>Активное повторение</strong>
+                  <div className="land-real-bars">
+                    {[
+                      ['Пн', 48],
+                      ['Вт', 63],
+                      ['Ср', 54],
+                      ['Чт', 78],
+                      ['Пт', 92],
+                      ['Сб', 67],
+                      ['Вс', 84],
+                    ].map(([day, value]) => (
+                      <div key={day}>
+                        <span style={{ height: `${value}%` }} />
+                        <small>{day}</small>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </article>
+              <div className="land-stats-summary">
+                <span><b /> 31 задача выполнена</span>
+                <span><b /> 7 дней активности</span>
+              </div>
+            </div>
+          </Reveal>
+        </section>
 
-            <article className="land-bento-card land-bento-card-wide land-bento-analytics">
-              <div className="land-bento-copy">
-                <span className="land-bento-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 19V5"/>
-                    <path d="M4 19h16"/>
-                    <rect x="7" y="11" width="3" height="5" rx="1"/>
-                    <rect x="12" y="7" width="3" height="9" rx="1"/>
-                    <rect x="17" y="9" width="3" height="7" rx="1"/>
-                  </svg>
-                </span>
-                <h3>Трекер прогресса</h3>
-                <p>Наглядная статистика выполненных задач и времени в фокусе.</p>
-              </div>
-              <div className="land-analytics-preview" aria-hidden="true">
-                <div className="land-analytics-bars">
-                  {[38, 62, 48, 82, 70, 92].map((height, index) => (
-                    <span key={index} style={{ height: `${height}%` }} />
-                  ))}
-                </div>
-                <div className="land-analytics-progress">
-                  <span />
-                </div>
-              </div>
-            </article>
+        <section className="land-section land-why-section" id="why">
+          <Reveal className="land-section-split-head">
+            <div>
+              <span>Почему Planify</span>
+              <h2>Не больше инструментов. Меньше хаоса.</h2>
+            </div>
+          </Reveal>
+          <div className="land-why-grid">
+            {WHY_CARDS.map((card, index) => (
+              <Reveal key={card.title} className="land-why-card" delay={index * 120}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <h3>{card.title}</h3>
+                <p>{card.text}</p>
+              </Reveal>
+            ))}
           </div>
         </section>
+
+        <Reveal className="land-section land-final-screen">
+          <span>Готов начать</span>
+          <h2>Пусть каждый учебный день будет понятнее.</h2>
+          <p>Открой Planify и собери свои задачи, заметки, карточки и прогресс в одном месте.</p>
+          <button className="land-btn-primary" onClick={() => openAuth('signup')}>
+            Начать пользоваться
+          </button>
+        </Reveal>
       </main>
 
       <footer className="land-footer">

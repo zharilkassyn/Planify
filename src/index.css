@@ -7902,8 +7902,10 @@ button.ghost {
 .land-root {
   min-height: 100vh;
   background:
-    linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(13, 148, 136, 0.08) 44%, rgba(255, 255, 255, 0) 74%),
+    linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(13, 148, 136, 0.09) 44%, rgba(255, 255, 255, 0) 74%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.035) 0%, rgba(255, 255, 255, 0) 22%, rgba(37, 99, 235, 0.045) 100%),
     linear-gradient(180deg, #F8FBFF 0%, #F4F8FF 48%, #FFFFFF 100%);
+  box-shadow: inset 0 -120px 160px rgba(37, 99, 235, 0.045);
   font-family: inherit;
 }
 
@@ -7929,7 +7931,7 @@ button.ghost {
   border: none;
   border-radius: 0;
 }
-.land-nav-brand { font-size: 26px; font-weight: 800; color: var(--ink); letter-spacing: -0.5px; }
+.land-nav-brand { font-size: 24px; font-weight: 800; color: var(--ink); letter-spacing: -0.5px; }
 .land-nav-links { display: flex; gap: 32px; }
 .land-nav-links a { font-size: 15px; color: var(--soft); text-decoration: none; font-weight: 500; }
 .land-nav-links a:hover { color: var(--ink); }
@@ -7988,7 +7990,7 @@ button.ghost {
   border-radius: 36px;
   background:
     linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(13, 148, 136, 0.14));
-  filter: blur(24px);
+  filter: blur(30px);
   opacity: 0.9;
   transform: rotate(-5deg);
   pointer-events: none;
@@ -8114,9 +8116,9 @@ button.ghost {
   border-radius: 22px;
   overflow: hidden;
   box-shadow:
-    0 42px 100px rgba(37, 99, 235, 0.24),
-    0 18px 44px rgba(15, 23, 42, 0.12),
-    0 4px 20px rgba(0, 0, 0, 0.07);
+    0 54px 120px rgba(37, 99, 235, 0.28),
+    0 26px 58px rgba(15, 23, 42, 0.16),
+    0 8px 24px rgba(0, 0, 0, 0.08);
   border: 1px solid #DBEAFE;
   background: white;
   height: 540px;
@@ -8187,13 +8189,13 @@ button.ghost {
 .land-bento-grid::before {
   content: "";
   position: absolute;
-  inset: -18px -20px;
+  inset: -24px -26px;
   z-index: -1;
   border-radius: 34px;
   background:
-    linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(13, 148, 136, 0.12), rgba(255, 255, 255, 0));
-  filter: blur(18px);
-  opacity: 0.9;
+    linear-gradient(135deg, rgba(37, 99, 235, 0.24), rgba(13, 148, 136, 0.16), rgba(255, 255, 255, 0));
+  filter: blur(24px);
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -8207,8 +8209,8 @@ button.ghost {
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow:
-    0 22px 56px rgba(15, 23, 42, 0.1),
-    0 8px 22px rgba(37, 99, 235, 0.06);
+    0 30px 72px rgba(15, 23, 42, 0.13),
+    0 12px 30px rgba(37, 99, 235, 0.1);
   backdrop-filter: blur(16px);
 }
 
@@ -8447,46 +8449,1413 @@ button.ghost {
   align-items: center;
   gap: 22px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(240, 253, 250, 0.76));
+  box-shadow:
+    0 34px 86px rgba(15, 23, 42, 0.14),
+    0 16px 36px rgba(13, 148, 136, 0.12);
 }
 
 .land-analytics-preview {
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   align-self: stretch;
-  min-height: 190px;
-  padding: 22px;
+  min-height: 230px;
+  padding: 18px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(226, 232, 240, 0.86);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.78));
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow:
+    0 22px 44px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
-.land-analytics-bars {
-  height: 126px;
+.land-analytics-head,
+.land-analytics-foot {
   display: flex;
-  align-items: end;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.land-analytics-bars span {
-  flex: 1;
-  min-width: 14px;
-  border-radius: 999px 999px 6px 6px;
-  background: linear-gradient(180deg, #2563EB, #93C5FD);
+.land-analytics-head span,
+.land-analytics-foot span {
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 750;
 }
 
-.land-analytics-progress {
-  height: 10px;
+.land-analytics-head strong {
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.land-analytics-chart {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 148px;
+}
+
+.land-analytics-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 0 20px;
+  color: #94A3B8;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.land-analytics-plot {
+  position: relative;
+  min-width: 0;
+  min-height: 148px;
+}
+
+.land-analytics-plot svg {
+  position: absolute;
+  inset: 0 0 24px;
+  width: 100%;
+  height: calc(100% - 24px);
+  overflow: visible;
+}
+
+.land-chart-grid {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.22);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-chart-area {
+  fill: rgba(37, 99, 235, 0.1);
+}
+
+.land-chart-line {
+  fill: none;
+  stroke: #2563EB;
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-analytics-plot circle {
+  fill: #FFFFFF;
+  stroke: #2563EB;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-analytics-columns {
+  position: absolute;
+  inset: 14px 6px 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+}
+
+.land-analytics-column {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.land-analytics-column span {
+  width: 100%;
+  max-width: 20px;
+  min-height: 18px;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.75), rgba(37, 99, 235, 0.28));
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
+}
+
+.land-analytics-column small {
+  color: #94A3B8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.land-analytics-foot {
+  padding-top: 2px;
+}
+
+.land-analytics-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.land-analytics-foot i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0D9488;
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.12);
+}
+
+.land-analytics-foot strong {
+  color: #0D9488;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.land-story-main {
+  position: relative;
   overflow: hidden;
+  margin-top: -2px;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0) 0%, rgba(37, 99, 235, 0.08) 18%, rgba(96, 165, 250, 0.05) 36%, rgba(255, 255, 255, 0) 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 10%, rgba(239, 246, 255, 0.52) 25%, rgba(255, 255, 255, 0.92) 58%, rgba(248, 250, 252, 0.95) 100%);
+  box-shadow:
+    inset 0 120px 170px rgba(37, 99, 235, 0.025),
+    inset 0 -160px 220px rgba(37, 99, 235, 0.035);
+}
+
+.land-reveal {
+  opacity: 0;
+  transform: translateY(50px);
+  transition:
+    opacity 1100ms ease-out var(--reveal-delay, 0ms),
+    transform 1100ms ease-out var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.land-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.land-showcase-copy,
+.land-product-frame,
+.land-section-split-head > *,
+.land-game-tile,
+.land-plan-row,
+.land-note-tasks li,
+.land-process-step,
+.land-chat-bubble,
+.land-chat-input,
+.land-stats-dashboard-head,
+.land-real-chart,
+.land-stats-summary {
+  transition:
+    opacity 900ms ease-out,
+    transform 900ms ease-out,
+    box-shadow 220ms ease;
+}
+
+.land-reveal:not(.is-visible) .land-showcase-copy,
+.land-reveal:not(.is-visible) .land-product-frame,
+.land-reveal:not(.is-visible) .land-section-split-head > *,
+.land-reveal:not(.is-visible) .land-game-tile,
+.land-reveal:not(.is-visible) .land-plan-row,
+.land-reveal:not(.is-visible) .land-note-tasks li,
+.land-reveal:not(.is-visible) .land-process-step,
+.land-reveal:not(.is-visible) .land-chat-bubble,
+.land-reveal:not(.is-visible) .land-chat-input,
+.land-reveal:not(.is-visible) .land-stats-dashboard-head,
+.land-reveal:not(.is-visible) .land-real-chart,
+.land-reveal:not(.is-visible) .land-stats-summary {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+.land-reveal.is-visible .land-product-frame,
+.land-reveal.is-visible .land-section-split-head > p {
+  transition-delay: 140ms;
+}
+
+.land-reveal.is-visible .land-plan-row:nth-child(2),
+.land-reveal.is-visible .land-note-tasks li:nth-child(1),
+.land-reveal.is-visible .land-process-step:nth-child(1),
+.land-reveal.is-visible .land-chat-bubble:nth-child(1),
+.land-reveal.is-visible .land-game-tile:nth-child(1) {
+  transition-delay: 120ms;
+}
+
+.land-reveal.is-visible .land-plan-row:nth-child(3),
+.land-reveal.is-visible .land-note-tasks li:nth-child(2),
+.land-reveal.is-visible .land-process-step:nth-child(3),
+.land-reveal.is-visible .land-chat-bubble:nth-child(2),
+.land-reveal.is-visible .land-game-tile:nth-child(2) {
+  transition-delay: 220ms;
+}
+
+.land-reveal.is-visible .land-plan-row:nth-child(4),
+.land-reveal.is-visible .land-note-tasks li:nth-child(3),
+.land-reveal.is-visible .land-chat-bubble:nth-child(3),
+.land-reveal.is-visible .land-game-tile:nth-child(3),
+.land-reveal.is-visible .land-real-chart {
+  transition-delay: 320ms;
+}
+
+.land-reveal.is-visible .land-plan-row:nth-child(5),
+.land-reveal.is-visible .land-note-tasks li:nth-child(4),
+.land-reveal.is-visible .land-chat-input,
+.land-reveal.is-visible .land-game-tile:nth-child(4),
+.land-reveal.is-visible .land-stats-summary {
+  transition-delay: 420ms;
+}
+
+.land-reveal:not(.is-visible) .land-product-frame {
+  transform: translateY(36px) scale(0.98);
+}
+
+.land-reveal.is-visible .land-product-frame {
+  transform: translateY(0) scale(1);
+}
+
+.land-story-intro {
+  max-width: 860px;
+  text-align: center;
+  padding: 92px 0 48px;
+}
+
+.land-story-kicker,
+.land-showcase-copy span,
+.land-section-split-head span,
+.land-final-screen > span {
+  display: inline-flex;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.land-story-intro h2,
+.land-section-split-head h2,
+.land-final-screen h2 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 44px;
+  line-height: 1.08;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.land-story-intro p,
+.land-section-split-head p,
+.land-final-screen p {
+  max-width: 650px;
+  margin: 18px auto 0;
+  color: var(--soft);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.land-feature-showcase-list {
+  position: relative;
+  display: grid;
+  gap: 34px;
+}
+
+.land-feature-showcase-list::before {
+  content: "";
+  position: absolute;
+  inset: 60px -80px 120px;
+  pointer-events: none;
+  border-radius: 60px;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(147, 197, 253, 0.07), rgba(255, 255, 255, 0));
+  filter: blur(28px);
+}
+
+.land-showcase-panel {
+  position: relative;
+  z-index: 1;
+  min-height: 520px;
+  padding: 42px;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+  align-items: center;
+  gap: 42px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 32px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.82)),
+    rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 44px 120px rgba(15, 23, 42, 0.14),
+    0 24px 64px rgba(37, 99, 235, 0.14),
+    0 8px 22px rgba(37, 99, 235, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.land-showcase-panel::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(255, 255, 255, 0), rgba(96, 165, 250, 0.12));
+  opacity: 0.9;
+}
+
+.land-showcase-panel:hover,
+.land-why-card:hover,
+.land-game-tile:hover,
+.land-final-screen:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 54px 140px rgba(15, 23, 42, 0.16),
+    0 28px 76px rgba(37, 99, 235, 0.18);
+}
+
+.land-showcase-copy h2 {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.land-showcase-copy p {
+  margin: 18px 0 0;
+  color: var(--soft);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.land-product-frame {
+  position: relative;
+  min-height: 340px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.88));
+  box-shadow:
+    0 34px 82px rgba(15, 23, 42, 0.15),
+    0 16px 42px rgba(37, 99, 235, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.land-mini-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.land-mini-toolbar strong {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 950;
+}
+
+.land-mini-toolbar span {
+  color: var(--soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.land-planner-mock {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-bottom: 22px;
+}
+
+.land-plan-row {
+  margin: 0 22px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.08);
+}
+
+.land-plan-row span {
+  color: #94A3B8;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.land-plan-row strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.land-plan-row i {
+  padding: 6px 10px;
   border-radius: 999px;
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.1);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.land-notes-mock {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+}
+
+.land-notes-mock aside {
+  padding: 22px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  background: rgba(248, 250, 252, 0.9);
+  border-right: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.land-notes-mock aside span,
+.land-notes-mock > div > span {
+  color: #94A3B8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.land-notes-mock aside b {
+  padding: 12px;
+  border-radius: 14px;
+  color: var(--ink);
+  background: #FFFFFF;
+  font-size: 13px;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.08);
+}
+
+.land-notes-mock > div {
+  padding: 28px;
+}
+
+.land-notes-mock h3 {
+  margin: 18px 0 22px;
+  color: var(--ink);
+  font-size: 28px;
+}
+
+.land-note-tasks {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.land-note-tasks li {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--ink);
+  background: #F8FAFC;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.land-note-tasks b {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2563EB;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.land-flashcards-mock {
+  min-height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.06)),
+    #FFFFFF;
+}
+
+.land-deck-card {
+  position: absolute;
+  width: min(280px, 72%);
+  min-height: 190px;
+  border-radius: 24px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  box-shadow:
+    0 32px 70px rgba(15, 23, 42, 0.16),
+    0 14px 34px rgba(37, 99, 235, 0.12);
+}
+
+.land-deck-card-back {
+  transform: translate(-34px, 28px) rotate(-9deg);
   background: #DBEAFE;
 }
 
-.land-analytics-progress span {
+.land-deck-card-middle {
+  transform: translate(-16px, 12px) rotate(-4deg);
+  background: #EFF6FF;
+}
+
+.land-deck-card-front {
+  position: relative;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #FFFFFF;
+}
+
+.land-reveal.is-visible .land-deck-card-back {
+  animation: landCardBack 900ms ease-out both;
+}
+
+.land-reveal.is-visible .land-deck-card-middle {
+  animation: landCardMid 950ms ease-out 120ms both;
+}
+
+.land-reveal.is-visible .land-deck-card-front {
+  animation: landCardFront 1000ms ease-out 220ms both;
+}
+
+@keyframes landCardBack {
+  from { opacity: 0; transform: translate(-14px, 42px) rotate(-2deg); }
+  to { opacity: 1; transform: translate(-34px, 28px) rotate(-9deg); }
+}
+
+@keyframes landCardMid {
+  from { opacity: 0; transform: translate(-4px, 32px) rotate(0deg); }
+  to { opacity: 1; transform: translate(-16px, 12px) rotate(-4deg); }
+}
+
+@keyframes landCardFront {
+  from { opacity: 0; transform: translateY(34px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.land-deck-card-front span {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.land-deck-card-front strong {
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1.12;
+}
+
+.land-deck-card-front p {
+  margin: 14px 0 0;
+  color: var(--soft);
+  font-size: 15px;
+}
+
+.land-presentation-mock {
+  padding: 28px;
+  padding-right: 28px;
+  padding-bottom: 74px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  align-items: center;
+  gap: 18px;
+}
+
+.land-process-step {
+  width: 100%;
+  max-width: 100%;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 4px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.08);
+}
+
+.land-process-step span {
+  grid-row: span 2;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.1);
+  font-weight: 950;
+}
+
+.land-process-step strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.land-process-step p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 13px;
+}
+
+.land-process-step.active {
+  box-shadow: 0 18px 42px rgba(37, 99, 235, 0.12);
+}
+
+.land-process-line {
+  width: 2px;
+  height: 34px;
+  margin-left: 38px;
+  border-radius: 999px;
+  background: linear-gradient(#93C5FD, #DBEAFE);
+}
+
+.land-slide-stack {
+  position: absolute;
+  right: 14px;
+  bottom: 24px;
+  width: 154px;
+  height: 109px;
+  perspective: 900px;
+}
+
+.land-presentation-card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  background: #FFFFFF;
+  box-shadow:
+    0 34px 74px rgba(15, 23, 42, 0.2),
+    0 14px 34px rgba(37, 99, 235, 0.14);
+}
+
+.land-presentation-card-back {
+  transform: translate(-16px, 13px) rotate(-8deg) rotateY(8deg);
+  background: #DBEAFE;
+}
+
+.land-presentation-card-mid {
+  transform: translate(-7px, 6px) rotate(-4deg) rotateY(4deg);
+  background: #EFF6FF;
+}
+
+.land-presentation-card-front {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  transform: rotate(5deg) rotateY(-2deg) rotateX(2deg);
+}
+
+.land-reveal.is-visible .land-presentation-card-back {
+  animation: landPresentationBack 900ms ease-out both;
+}
+
+.land-reveal.is-visible .land-presentation-card-mid {
+  animation: landPresentationMid 950ms ease-out 120ms both;
+}
+
+.land-reveal.is-visible .land-presentation-card-front {
+  animation: landPresentationFront 1000ms ease-out 220ms both;
+}
+
+@keyframes landPresentationBack {
+  from { opacity: 0; transform: translate(-10px, 42px) rotate(-2deg); }
+  to { opacity: 1; transform: translate(-16px, 13px) rotate(-8deg) rotateY(8deg); }
+}
+
+@keyframes landPresentationMid {
+  from { opacity: 0; transform: translate(-4px, 30px) rotate(0deg); }
+  to { opacity: 1; transform: translate(-7px, 6px) rotate(-4deg) rotateY(4deg); }
+}
+
+@keyframes landPresentationFront {
+  from { opacity: 0; transform: translateY(32px) scale(0.96); }
+  to { opacity: 1; transform: rotate(5deg) rotateY(-2deg) rotateX(2deg); }
+}
+
+.land-space-cover {
+  position: relative;
+  min-height: 72px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 66% 28%, rgba(255, 255, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.75) 0 1px, transparent 2px),
+    radial-gradient(circle at 84% 72%, rgba(255, 255, 255, 0.85) 0 1px, transparent 2px),
+    linear-gradient(135deg, #0F172A 0%, #1E3A8A 48%, #2563EB 100%);
+}
+
+.land-space-planet {
+  position: absolute;
+  right: 18px;
+  bottom: -14px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, #FDE68A, #F97316 48%, #7C2D12);
+  box-shadow: 0 0 42px rgba(249, 115, 22, 0.45);
+}
+
+.land-space-orbit {
+  position: absolute;
+  right: -2px;
+  bottom: 11px;
+  width: 92px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 50%;
+  transform: rotate(-17deg);
+}
+
+.land-space-star {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #FFFFFF;
+}
+
+.star-one {
+  left: 28px;
+  top: 26px;
+}
+
+.star-two {
+  left: 82px;
+  top: 48px;
+}
+
+.star-three {
+  right: 58px;
+  top: 20px;
+}
+
+.land-slide-caption {
+  padding: 8px 10px 9px;
+}
+
+.land-slide-caption span {
   display: block;
-  width: 74%;
+  color: var(--primary);
+  font-size: 8px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.land-slide-caption strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.land-slide-caption p {
+  margin: 2px 0 0;
+  color: var(--soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.land-chat-mock {
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.land-chat-bubble {
+  max-width: 78%;
+  padding: 13px 15px;
+  border-radius: 18px;
+  color: var(--ink);
+  background: #F8FAFC;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-size: 13px;
+  font-weight: 750;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.land-chat-bubble.user {
+  align-self: flex-end;
+  color: #FFFFFF;
+  background: #2563EB;
+}
+
+.land-chat-bubble.wide {
+  max-width: 92%;
+  line-height: 1.55;
+}
+
+.land-chat-input {
+  margin-top: auto;
+  min-height: 48px;
+  padding: 0 8px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  color: #94A3B8;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.land-chat-input b {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #FFFFFF;
+  background: #2563EB;
+}
+
+.land-section-split-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 26px;
+}
+
+.land-section-split-head h2 {
+  max-width: 650px;
+  font-size: 36px;
+}
+
+.land-section-split-head p {
+  max-width: 330px;
+  margin: 0;
+}
+
+.land-games-section {
+  overflow: hidden;
+  padding-top: 78px;
+  padding-bottom: 78px;
+}
+
+.land-games-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(210px, 260px);
+  gap: 18px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  padding: 8px 4px 24px;
+}
+
+.land-games-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.land-games-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.22);
+}
+
+.land-game-tile {
+  scroll-snap-align: start;
+  min-height: 250px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 26px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 28px 72px rgba(15, 23, 42, 0.12),
+    0 14px 38px rgba(37, 99, 235, 0.1);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.land-game-tile strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.land-game-art {
+  height: 154px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 24% 22%, rgba(255, 255, 255, 0.95), transparent 30%),
+    linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.94));
+}
+
+.land-game-art::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.42);
+  filter: blur(18px);
+}
+
+.land-sudoku-board,
+.land-tiles-2048 {
+  position: relative;
+  z-index: 1;
+  width: 112px;
+  height: 112px;
+  padding: 8px;
+  display: grid;
+  gap: 5px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.land-sudoku-board {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.land-sudoku-board span {
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #1D4ED8;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.land-sudoku-board span:empty {
+  background: #FFFFFF;
+}
+
+.land-chess-scene,
+.land-tennis-scene {
+  position: relative;
+  z-index: 1;
+  width: 126px;
+  height: 112px;
+}
+
+.chess-piece-shadow {
+  position: absolute;
+  left: 22px;
+  right: 18px;
+  bottom: 10px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(30, 64, 175, 0.18);
+  filter: blur(3px);
+}
+
+.chess-piece-main {
+  position: absolute;
+  left: 38px;
+  bottom: 18px;
+  width: 54px;
+  height: 86px;
+  border-radius: 28px 28px 12px 12px;
+  background:
+    radial-gradient(circle at 50% 12px, #FFFFFF 0 13px, transparent 14px),
+    linear-gradient(180deg, #2563EB, #0F172A);
+  box-shadow:
+    0 18px 38px rgba(37, 99, 235, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.chess-piece-main::before,
+.chess-piece-main::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #60A5FA, #1E40AF);
+}
+
+.chess-piece-main::before {
+  top: 36px;
+  height: 16px;
+}
+
+.chess-piece-main::after {
+  bottom: -8px;
+  height: 20px;
+}
+
+.land-tiles-2048 {
+  grid-template-columns: repeat(2, 1fr);
+  background: linear-gradient(145deg, #92400E, #F59E0B);
+}
+
+.land-tiles-2048 span {
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #7C2D12;
+  background: #FEF3C7;
+  box-shadow: inset 0 -3px 0 rgba(120, 53, 15, 0.08);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.land-tiles-2048 span:nth-child(4) {
+  color: #FFFFFF;
+  background: #F97316;
+}
+
+.land-tennis-scene {
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(135deg, #059669, #22C55E);
+  background-size: 42px 42px, 42px 42px, auto;
+  box-shadow: 0 18px 44px rgba(4, 120, 87, 0.24);
+}
+
+.tennis-court-line {
+  position: absolute;
+  inset: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: 12px;
+}
+
+.tennis-court-line::before,
+.tennis-court-line::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.tennis-court-line::before {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.tennis-court-line::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+}
+
+.tennis-racket {
+  position: absolute;
+  left: 24px;
+  bottom: 20px;
+  width: 30px;
+  height: 46px;
+  border: 4px solid #FFFFFF;
+  border-radius: 50%;
+  transform: rotate(-28deg);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+}
+
+.tennis-racket::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  bottom: -24px;
+  width: 6px;
+  height: 32px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  transform: rotate(-12deg);
+}
+
+.tennis-ball {
+  position: absolute;
+  right: 28px;
+  top: 26px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #FEF08A;
+  box-shadow: 0 0 0 5px rgba(254, 240, 138, 0.26), 0 10px 20px rgba(15, 23, 42, 0.18);
+}
+
+.land-game-tile:nth-child(1) .land-game-art {
+  background: linear-gradient(135deg, #DBEAFE, #F8FAFC);
+}
+
+.land-game-tile:nth-child(2) .land-game-art {
+  background: linear-gradient(135deg, #F8FAFC, #DBEAFE);
+}
+
+.land-game-tile:nth-child(3) .land-game-art {
+  background: linear-gradient(135deg, #FEF3C7, #FDBA74);
+}
+
+.land-game-tile:nth-child(4) .land-game-art {
+  background: linear-gradient(135deg, #D1FAE5, #DBEAFE);
+}
+
+.land-stats-mock {
+  min-height: 420px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow:
+    0 36px 90px rgba(15, 23, 42, 0.16),
+    0 18px 46px rgba(37, 99, 235, 0.12);
+}
+
+.land-stats-dashboard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.land-stats-dashboard-head span {
+  display: block;
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.land-stats-dashboard-head strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.land-stats-dashboard-head b {
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.land-real-chart {
+  flex: 1;
+  min-height: 250px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.land-real-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px 0 28px;
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.land-real-plot {
+  position: relative;
+  min-width: 0;
+}
+
+.land-real-plot svg {
+  position: absolute;
+  inset: 0 0 30px;
+  width: 100%;
+  height: calc(100% - 30px);
+  overflow: visible;
+}
+
+.land-stats-grid {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.24);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-stats-area {
+  fill: rgba(37, 99, 235, 0.1);
+}
+
+.land-stats-line {
+  fill: none;
+  stroke: #2563EB;
+  stroke-width: 4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-real-plot circle {
+  fill: #FFFFFF;
+  stroke: #2563EB;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.land-real-bars {
+  position: absolute;
+  inset: 30px 10px 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+}
+
+.land-real-bars div {
   height: 100%;
-  border-radius: inherit;
-  background: #0D9488;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 9px;
+}
+
+.land-real-bars span {
+  width: 100%;
+  max-width: 24px;
+  min-height: 22px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.82), rgba(147, 197, 253, 0.42));
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.14);
+}
+
+.land-real-bars small {
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.land-stats-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.land-stats-summary span {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  background: #F8FAFC;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.land-stats-summary b {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2563EB;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.land-why-section {
+  padding-top: 96px;
+}
+
+.land-why-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.land-why-card {
+  min-height: 220px;
+  padding: 24px;
+  border-radius: 26px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 22px 58px rgba(15, 23, 42, 0.08);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.land-why-card span {
+  color: rgba(37, 99, 235, 0.62);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.land-why-card h3 {
+  margin: 48px 0 10px;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 950;
+}
+
+.land-why-card p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.land-final-screen {
+  max-width: 980px;
+  margin-top: 80px;
+  padding: 74px 44px;
+  text-align: center;
+  border-radius: 34px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(239, 246, 255, 0.9)),
+    #FFFFFF;
+  box-shadow:
+    0 38px 110px rgba(15, 23, 42, 0.12),
+    0 16px 44px rgba(37, 99, 235, 0.12);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.land-final-screen .land-btn-primary {
+  margin-top: 30px;
+  min-width: 210px;
+  min-height: 52px;
+  border-radius: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .land-reveal,
+  .land-reveal.is-visible,
+  .land-reveal.is-visible .land-deck-card-back,
+  .land-reveal.is-visible .land-deck-card-middle,
+  .land-reveal.is-visible .land-deck-card-front,
+  .land-reveal.is-visible .land-presentation-card-back,
+  .land-reveal.is-visible .land-presentation-card-mid,
+  .land-reveal.is-visible .land-presentation-card-front,
+  .land-showcase-copy,
+  .land-product-frame,
+  .land-section-split-head > *,
+  .land-game-tile,
+  .land-plan-row,
+  .land-note-tasks li,
+  .land-process-step,
+  .land-chat-bubble,
+  .land-chat-input,
+  .land-stats-dashboard-head,
+  .land-real-chart,
+  .land-stats-summary {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .land-section-head {
@@ -8926,6 +10295,45 @@ button.ghost {
    RESPONSIVE — TABLET (≤1024px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
+  .land-story-intro h2,
+  .land-section-split-head h2,
+  .land-final-screen h2 {
+    font-size: 36px;
+  }
+
+  .land-showcase-panel {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 34px;
+  }
+
+  .land-showcase-notes .land-product-frame,
+  .land-showcase-presentations .land-product-frame {
+    order: 2;
+  }
+
+  .land-showcase-notes .land-showcase-copy,
+  .land-showcase-presentations .land-showcase-copy {
+    order: 1;
+  }
+
+  .land-showcase-copy h2 {
+    font-size: 32px;
+  }
+
+  .land-section-split-head {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .land-section-split-head p {
+    max-width: 620px;
+  }
+
+  .land-why-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .land-bento-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9699,6 +11107,144 @@ button.ghost {
     padding: 42px 0;
   }
 
+  .land-reveal {
+    transform: translateY(42px);
+  }
+
+  .land-story-intro {
+    padding: 62px 0 28px;
+    text-align: left;
+  }
+
+  .land-story-intro h2,
+  .land-section-split-head h2,
+  .land-final-screen h2 {
+    font-size: 28px;
+    line-height: 1.15;
+  }
+
+  .land-story-intro p,
+  .land-final-screen p {
+    margin-left: 0;
+    margin-right: 0;
+    font-size: 15px;
+  }
+
+  .land-feature-showcase-list {
+    gap: 20px;
+  }
+
+  .land-showcase-panel {
+    padding: 22px;
+    gap: 24px;
+    border-radius: 24px;
+  }
+
+  .land-showcase-copy h2 {
+    font-size: 27px;
+  }
+
+  .land-showcase-copy p {
+    font-size: 14px;
+  }
+
+  .land-product-frame {
+    min-height: 300px;
+    border-radius: 22px;
+  }
+
+  .land-plan-row {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .land-plan-row i {
+    grid-column: 2;
+    width: max-content;
+  }
+
+  .land-notes-mock {
+    grid-template-columns: 1fr;
+  }
+
+  .land-notes-mock aside {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-right: none;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
+  .land-notes-mock aside span {
+    grid-column: 1 / -1;
+  }
+
+  .land-notes-mock aside b {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .land-deck-card {
+    width: min(240px, 78%);
+  }
+
+  .land-presentation-mock {
+    grid-template-columns: 1fr;
+    padding-right: 22px;
+    padding-bottom: 22px;
+  }
+
+  .land-slide-stack {
+    position: relative;
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: center;
+    right: auto;
+    bottom: auto;
+    width: min(190px, 86%);
+    height: 134px;
+  }
+
+  .land-space-cover {
+    min-height: 82px;
+  }
+
+  .land-games-section {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  .land-games-scroll {
+    grid-auto-columns: minmax(190px, 78vw);
+  }
+
+  .land-real-chart {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .land-real-bars {
+    gap: 5px;
+  }
+
+  .land-real-bars span {
+    max-width: 16px;
+  }
+
+  .land-stats-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .land-why-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .land-why-card {
+    min-height: 190px;
+  }
+
+  .land-final-screen {
+    margin-top: 46px;
+    padding: 44px 22px;
+    border-radius: 26px;
+  }
+
   .land-features-section {
     padding-top: 18px;
   }
@@ -9754,7 +11300,20 @@ button.ghost {
   }
 
   .land-analytics-preview {
-    min-height: 170px;
+    min-height: 230px;
+    padding: 16px;
+  }
+
+  .land-analytics-chart {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .land-analytics-columns {
+    gap: 5px;
+  }
+
+  .land-analytics-column span {
+    max-width: 16px;
   }
 
   .land-section-head h2 {
