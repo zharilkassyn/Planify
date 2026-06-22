@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { supabase } from '../lib/supabase';
 import { THEMES, type ThemeKey } from '../lib/themes';
 
@@ -142,7 +142,7 @@ export function SettingsPage({ displayName, email, onNameChange, avatarColor, on
           {/* Email */}
           <div className="settings-field">
             <label className="settings-label">Почта</label>
-            <input className="settings-input" value={email} disabled style={{ background: '#F8FAFC', color: '#94A3B8', cursor: 'not-allowed' }}/>
+            <input className="settings-input" value={email} disabled style={{ cursor: 'not-allowed' }}/>
             <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>Почту изменить нельзя</div>
           </div>
         </div>
@@ -157,17 +157,16 @@ export function SettingsPage({ displayName, email, onNameChange, avatarColor, on
             </svg>
             Тема оформления
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div className="settings-theme-grid">
             {(Object.entries(THEMES) as [ThemeKey, typeof THEMES[ThemeKey]][]).map(([key, t]) => (
               <button key={key} onClick={() => onThemeChange(key)}
+                className={`settings-theme-option${theme === key ? ' active' : ''}`}
                 style={{
-                  border: theme === key ? `2px solid ${t.primary}` : '2px solid #E2E8F0',
-                  borderRadius: 12, padding: '12px 10px', background: theme === key ? t.vars['--primary-light'] : 'white',
-                  cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                  transition: 'all 0.15s',
-                }}>
+                  '--theme-color': t.primary,
+                  '--theme-bg': t.vars['--primary-light'],
+                } as CSSProperties}>
                 {/* Mini preview */}
-                <div style={{ width: 48, height: 36, borderRadius: 8, background: t.vars['--bg'], border: '1px solid #E2E8F0', overflow: 'hidden', position: 'relative' }}>
+                <div className="settings-theme-preview" style={{ background: t.vars['--bg'], borderColor: t.vars['--border'] }}>
                   <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, background: t.vars['--card'], borderRight: `1px solid ${t.vars['--border']}` }}/>
                   <div style={{ position: 'absolute', left: 16, top: 5, right: 3, height: 5, borderRadius: 3, background: t.primary }}/>
                   <div style={{ position: 'absolute', left: 16, top: 13, right: 3, height: 3, borderRadius: 3, background: t.vars['--primary-mid'] }}/>
@@ -176,9 +175,9 @@ export function SettingsPage({ displayName, email, onNameChange, avatarColor, on
                   <div style={{ position: 'absolute', left: 3, top: 18, width: 8, height: 3, borderRadius: 2, background: t.vars['--primary-mid'] }}/>
                   {key === 'dark' && <div style={{ position: 'absolute', inset: 0, background: t.vars['--bg'], opacity: 0.6 }}/>}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: theme === key ? t.primary : '#64748B' }}>{t.name}</div>
+                <div className="settings-theme-name">{t.name}</div>
                 {theme === key && (
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.primary }}/>
+                  <div className="settings-theme-dot"/>
                 )}
               </button>
             ))}

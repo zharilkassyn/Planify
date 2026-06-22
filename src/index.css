@@ -6484,6 +6484,12 @@ button.ghost {
 .send-btn:hover { background: var(--primary-dark); }
 .send-btn:disabled { opacity: 0.4; cursor: default; }
 
+.send-icon {
+  width: 36px;
+  height: 36px;
+  stroke-width: 3.1;
+}
+
 /* AI right panel */
 .ai-right {
   display: flex;
@@ -7059,14 +7065,27 @@ button.ghost {
 /* ═══════════════════════════════════════════════════
    SETTINGS PAGE
 ═══════════════════════════════════════════════════ */
-.settings-layout { display: flex; flex-direction: column; gap: 20px; max-width: 640px; }
+.settings-layout {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 .settings-header { display: flex; align-items: center; justify-content: space-between; }
-.settings-body { display: flex; flex-direction: column; gap: 16px; }
+.settings-body {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
 .settings-card {
   background: var(--card);
   border: 1px solid #E2E8F0;
   border-radius: 16px;
   padding: 24px;
+  min-width: 0;
 }
 .settings-card-title {
   display: flex;
@@ -7092,18 +7111,84 @@ button.ghost {
 }
 .settings-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-mid); }
 
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 136px));
+  gap: 12px;
+  justify-content: start;
+}
+
+.settings-theme-option {
+  width: 100%;
+  min-height: 102px;
+  border: 2px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 12px 10px;
+  background: var(--card);
+  color: #64748B;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.settings-theme-option:hover {
+  transform: translateY(-1px);
+  border-color: var(--theme-color);
+}
+
+.settings-theme-option.active {
+  border-color: var(--theme-color);
+  background: var(--theme-bg);
+}
+
+.settings-theme-preview {
+  width: 48px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  position: relative;
+}
+
+.settings-theme-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.settings-theme-option.active .settings-theme-name {
+  color: var(--theme-color);
+}
+
+.settings-theme-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--theme-color);
+}
+
 /* Hover on sidebar user section */
 .sidebar-user:hover { background: var(--primary-light); border-radius: 10px; }
 
 /* ═══════════════════════════════════════════════════
    NOTES PAGE
 ═══════════════════════════════════════════════════ */
+.main-content:has(.notes-layout) {
+  height: 100vh;
+  overflow: hidden;
+  padding: 0;
+}
+
 .notes-layout {
   display: flex;
-  height: 100%;
+  height: 100vh;
+  max-height: 100vh;
   gap: 0;
   overflow: hidden;
-  margin: -24px;
+  margin: 0;
 }
 
 /* ── Sidebar ── */
@@ -7282,7 +7367,8 @@ button.ghost {
 
 /* ── Editor panel ── */
 .notes-editor-panel {
-  flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--card); padding: 24px 28px;
+  flex: 1; display: flex; flex-direction: column; overflow-y: auto; background: var(--card); padding: 24px 28px;
+  min-height: 0;
 }
 .ne-empty {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -7895,6 +7981,359 @@ button.ghost {
 
 /* Generic white backgrounds */
 [data-theme="dark"] .loading { background: #0F172A; color: #F1F5F9; }
+
+/* Dark theme: monochrome, no white panels */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .main-content {
+  background: #050505 !important;
+  color: #FAFAFA;
+}
+
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .bottom-nav {
+  background: #080808 !important;
+  border-color: #262626 !important;
+  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .sidebar-brand-pill,
+[data-theme="dark"] .sidebar-toggle-btn {
+  background: #FAFAFA !important;
+  border-color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .sidebar-toggle-btn span {
+  background: #FAFAFA !important;
+}
+
+[data-theme="dark"] .nav-item,
+[data-theme="dark"] .bottom-nav-item {
+  color: #A3A3A3;
+}
+
+[data-theme="dark"] .nav-item:hover,
+[data-theme="dark"] .bottom-nav-item:hover {
+  background: #151515 !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="dark"] .nav-item.active,
+[data-theme="dark"] .bottom-nav-item.active {
+  background: #FAFAFA !important;
+  color: #050505 !important;
+  box-shadow: 0 16px 38px rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .nav-item.active svg,
+[data-theme="dark"] .bottom-nav-item.active svg {
+  color: #050505 !important;
+  stroke: #050505 !important;
+}
+
+[data-theme="dark"] .dash-card,
+[data-theme="dark"] .dash-header-right,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .timer-ring-card,
+[data-theme="dark"] .timer-card,
+[data-theme="dark"] .timer-circle-wrap,
+[data-theme="dark"] .settings-panel,
+[data-theme="dark"] .current-task-card,
+[data-theme="dark"] .task-item,
+[data-theme="dark"] .planner-header,
+[data-theme="dark"] .day-view-col,
+[data-theme="dark"] .week-grid,
+[data-theme="dark"] .month-grid,
+[data-theme="dark"] .ai-hdr-btn,
+[data-theme="dark"] .msg-bubble.ai,
+[data-theme="dark"] .chat-input-wrap,
+[data-theme="dark"] .fc-deck-card,
+[data-theme="dark"] .fc-stat-card,
+[data-theme="dark"] .fc-card-item,
+[data-theme="dark"] .notes-sidebar,
+[data-theme="dark"] .notes-list-panel,
+[data-theme="dark"] .settings-card,
+[data-theme="dark"] .game-card,
+[data-theme="dark"] .games-score,
+[data-theme="dark"] .games-hero,
+[data-theme="dark"] .pres-modal,
+[data-theme="dark"] .template-card {
+  background: #0A0A0A !important;
+  border-color: #262626 !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+[data-theme="dark"] .notes-editor-panel,
+[data-theme="dark"] .ai-layout,
+[data-theme="dark"] .ai-main,
+[data-theme="dark"] .ai-header,
+[data-theme="dark"] .ai-right,
+[data-theme="dark"] .chat-area,
+[data-theme="dark"] .planner-body,
+[data-theme="dark"] .timer-page,
+[data-theme="dark"] .games-page,
+[data-theme="dark"] .sudoku-page,
+[data-theme="dark"] .block-page,
+[data-theme="dark"] .chess-page,
+[data-theme="dark"] .cup-page,
+[data-theme="dark"] .g2048-page,
+[data-theme="dark"] .tennis-page {
+  background: #050505 !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] .settings-input,
+[data-theme="dark"] .chat-input,
+[data-theme="dark"] .fc-input,
+[data-theme="dark"] .fc-textarea,
+[data-theme="dark"] .nl-search,
+[data-theme="dark"] .ne-action-btn,
+[data-theme="dark"] .timer-tab,
+[data-theme="dark"] .settings-tab,
+[data-theme="dark"] .settings-row input,
+[data-theme="dark"] .timer-reset-btn,
+[data-theme="dark"] .timer-adj-btn,
+[data-theme="dark"] .fc-btn-secondary,
+[data-theme="dark"] .settings-theme-option {
+  background: #111111 !important;
+  border-color: #2A2A2A !important;
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] .settings-input:disabled {
+  background: #0D0D0D !important;
+  color: #8A8A8A !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] .settings-input:focus,
+[data-theme="dark"] .chat-input:focus,
+[data-theme="dark"] .fc-input:focus,
+[data-theme="dark"] .fc-textarea:focus,
+[data-theme="dark"] .settings-row input:focus {
+  border-color: #FAFAFA !important;
+  box-shadow: 0 0 0 3px rgba(250, 250, 250, 0.12) !important;
+}
+
+[data-theme="dark"] .msg-bubble.user,
+[data-theme="dark"] .send-btn,
+[data-theme="dark"] .fc-btn-primary,
+[data-theme="dark"] .nl-view-btn.active,
+[data-theme="dark"] .timer-tab.active,
+[data-theme="dark"] .settings-tab.active-settings,
+[data-theme="dark"] .timer-play-btn,
+[data-theme="dark"] .add-task-btn,
+[data-theme="dark"] .game-play-btn,
+[data-theme="dark"] .sudoku-start-overlay > button,
+[data-theme="dark"] .sudoku-pause-menu button:not(.ghost),
+[data-theme="dark"] .block-start-overlay > button,
+[data-theme="dark"] .block-pause-menu button:not(.ghost),
+[data-theme="dark"] .chess-start-overlay > button,
+[data-theme="dark"] .chess-pause-menu button:not(.ghost),
+[data-theme="dark"] .cup-start-overlay > button,
+[data-theme="dark"] .g2048-start-overlay > button,
+[data-theme="dark"] .g2048-pause-menu button:not(.ghost),
+[data-theme="dark"] .tennis-start-overlay > button,
+[data-theme="dark"] .tennis-pause-menu button:not(.ghost),
+[data-theme="dark"] .week-event,
+[data-theme="dark"] .settings-theme-option.active {
+  background: #FAFAFA !important;
+  color: #050505 !important;
+  border-color: #FAFAFA !important;
+  box-shadow: 0 16px 38px rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .send-btn svg,
+[data-theme="dark"] .fc-btn-primary svg,
+[data-theme="dark"] .timer-play-btn svg,
+[data-theme="dark"] .timer-tab.active svg,
+[data-theme="dark"] .settings-tab.active-settings svg,
+[data-theme="dark"] .game-play-btn svg {
+  color: #050505 !important;
+  stroke: #050505 !important;
+}
+
+[data-theme="dark"] .settings-theme-option.active .settings-theme-name {
+  color: #050505;
+}
+
+[data-theme="dark"] .settings-theme-dot {
+  background: #050505;
+}
+
+[data-theme="dark"] .timer-reset-btn:hover,
+[data-theme="dark"] .ns-folder-item:hover,
+[data-theme="dark"] .nl-item:hover,
+[data-theme="dark"] .recent-chat-item:hover,
+[data-theme="dark"] .task-item:hover,
+[data-theme="dark"] .fc-deck-row:hover,
+[data-theme="dark"] .nl-grid-item:hover {
+  background: #181818 !important;
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .ns-folder-item.active,
+[data-theme="dark"] .nl-item.active,
+[data-theme="dark"] .history-item.active,
+[data-theme="dark"] .recent-chat-item.active {
+  background: #FAFAFA !important;
+  color: #050505 !important;
+  border-color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .panel-title,
+[data-theme="dark"] .panel-header,
+[data-theme="dark"] .settings-card-title,
+[data-theme="dark"] .timer-big-time,
+[data-theme="dark"] .ct-title,
+[data-theme="dark"] .nl-item-title,
+[data-theme="dark"] .ne-title-input,
+[data-theme="dark"] .user-name,
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3 {
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .settings-label,
+[data-theme="dark"] .timer-circle-label,
+[data-theme="dark"] .ct-sub,
+[data-theme="dark"] .nl-group-label,
+[data-theme="dark"] .ne-meta,
+[data-theme="dark"] .user-role,
+[data-theme="dark"] .nl-item-preview {
+  color: #A3A3A3 !important;
+}
+
+[data-theme="dark"] .sidebar-logo-text,
+[data-theme="dark"] .games-page,
+[data-theme="dark"] .sudoku-page,
+[data-theme="dark"] .block-page,
+[data-theme="dark"] .chess-page,
+[data-theme="dark"] .cup-page,
+[data-theme="dark"] .g2048-page,
+[data-theme="dark"] .tennis-page {
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .sidebar-brand-pill,
+[data-theme="dark"] .sidebar-brand-pill *,
+[data-theme="dark"] .sidebar-logo-text,
+[data-theme="dark"] .sidebar-logo-icon {
+  color: #050505 !important;
+}
+
+[data-theme="dark"] .sidebar-logo-icon {
+  background: #FAFAFA !important;
+}
+
+[data-theme="dark"] .games-header p,
+[data-theme="dark"] .games-hero p,
+[data-theme="dark"] .game-copy p,
+[data-theme="dark"] .game-difficulty,
+[data-theme="dark"] .games-score span,
+[data-theme="dark"] .sudoku-header p,
+[data-theme="dark"] .sudoku-sync,
+[data-theme="dark"] .sudoku-topline span,
+[data-theme="dark"] .sudoku-stats span,
+[data-theme="dark"] .sudoku-records span,
+[data-theme="dark"] .sudoku-daily span,
+[data-theme="dark"] .block-header p,
+[data-theme="dark"] .block-sync,
+[data-theme="dark"] .block-topbar span,
+[data-theme="dark"] .block-sidebar span,
+[data-theme="dark"] .chess-header p,
+[data-theme="dark"] .chess-sync,
+[data-theme="dark"] .chess-topbar span,
+[data-theme="dark"] .chess-captures span,
+[data-theme="dark"] .chess-sidebar span,
+[data-theme="dark"] .chess-history span,
+[data-theme="dark"] .cup-header p,
+[data-theme="dark"] .cup-sync,
+[data-theme="dark"] .cup-topbar span,
+[data-theme="dark"] .cup-sidebar span,
+[data-theme="dark"] .g2048-header p,
+[data-theme="dark"] .g2048-sync,
+[data-theme="dark"] .g2048-topbar span,
+[data-theme="dark"] .g2048-sidebar span,
+[data-theme="dark"] .g2048-hint p,
+[data-theme="dark"] .tennis-header p,
+[data-theme="dark"] .tennis-topbar span,
+[data-theme="dark"] .tennis-sidebar span,
+[data-theme="dark"] .tennis-hint p,
+[data-theme="dark"] .ai-welcome-sub,
+[data-theme="dark"] .msg-time {
+  color: #A3A3A3 !important;
+}
+
+[data-theme="dark"] .games-title-row h2,
+[data-theme="dark"] .games-hero h3,
+[data-theme="dark"] .game-copy h3,
+[data-theme="dark"] .games-score strong,
+[data-theme="dark"] .games-progress strong,
+[data-theme="dark"] .sudoku-header h2,
+[data-theme="dark"] .sudoku-topline strong,
+[data-theme="dark"] .sudoku-side h3,
+[data-theme="dark"] .sudoku-stats strong,
+[data-theme="dark"] .sudoku-records strong,
+[data-theme="dark"] .sudoku-daily strong,
+[data-theme="dark"] .sudoku-achievements strong,
+[data-theme="dark"] .block-header h2,
+[data-theme="dark"] .block-topbar strong,
+[data-theme="dark"] .block-sidebar h3,
+[data-theme="dark"] .chess-header h2,
+[data-theme="dark"] .chess-topbar strong,
+[data-theme="dark"] .chess-captures strong,
+[data-theme="dark"] .chess-sidebar h3,
+[data-theme="dark"] .chess-history strong,
+[data-theme="dark"] .cup-header h2,
+[data-theme="dark"] .cup-topbar strong,
+[data-theme="dark"] .cup-sidebar h3,
+[data-theme="dark"] .g2048-header h2,
+[data-theme="dark"] .g2048-topbar strong,
+[data-theme="dark"] .g2048-sidebar h3,
+[data-theme="dark"] .g2048-modes strong,
+[data-theme="dark"] .g2048-best-tile strong,
+[data-theme="dark"] .tennis-header h2,
+[data-theme="dark"] .tennis-topbar strong,
+[data-theme="dark"] .tennis-sidebar h3,
+[data-theme="dark"] .ai-welcome-title {
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .ai-welcome,
+[data-theme="dark"] .msg-avatar,
+[data-theme="dark"] .quick-btn,
+[data-theme="dark"] .cap-card,
+[data-theme="dark"] .ai-schedule-card,
+[data-theme="dark"] .ai-recent-panel,
+[data-theme="dark"] .recent-chat-item,
+[data-theme="dark"] .history-dropdown {
+  background: #0A0A0A !important;
+  border-color: #262626 !important;
+  color: #FAFAFA !important;
+}
+
+[data-theme="dark"] .quick-btn:hover,
+[data-theme="dark"] .cap-card:hover,
+[data-theme="dark"] .recent-chat-item:hover {
+  background: #181818 !important;
+  color: #FAFAFA !important;
+  border-color: #3A3A3A !important;
+}
+
+[data-theme="dark"] .msg-bubble.ai {
+  background: #111111 !important;
+  border-color: #2A2A2A !important;
+  color: #FAFAFA !important;
+}
 
 /* ═══════════════════════════════════════════════════
    LANDING PAGE
@@ -10295,6 +10734,10 @@ button.ghost {
    RESPONSIVE — TABLET (≤1024px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
+  .settings-body {
+    grid-template-columns: 1fr;
+  }
+
   .land-story-intro h2,
   .land-section-split-head h2,
   .land-final-screen h2 {
@@ -10977,10 +11420,17 @@ button.ghost {
   }
 
   /* ── Notes page ── */
+  .main-content:has(.notes-layout) {
+    height: auto;
+    overflow: visible;
+    padding: 16px 16px 84px;
+  }
+
   .notes-layout {
     flex-direction: column;
     margin: -16px;
     height: auto;
+    max-height: none;
     overflow: visible;
   }
   .notes-sidebar {
