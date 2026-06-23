@@ -37,13 +37,6 @@ const INFORMATION_LEVELS: Array<{ value: InformationLevel; title: string; desc: 
   { value: 'detailed', title: 'Подробная', desc: 'Больше объяснений, фактов и контента' },
 ];
 
-const AUDIENCES: Array<{ value: Audience; title: string }> = [
-  { value: 'school', title: 'Школьники' },
-  { value: 'students', title: 'Студенты' },
-  { value: 'business', title: 'Бизнес' },
-  { value: 'professionals', title: 'Профессионалы' },
-];
-
 const PLANNING_STEPS = [
   'Анализируем тему...',
   'Создаём план...',
@@ -76,7 +69,6 @@ export function PresentationModal({ topic, selectedTemplate, startMode, initialS
   );
   const [slidesCount, setSlidesCount] = useState(initialSlides?.length || 10);
   const [informationLevel, setInformationLevel] = useState<InformationLevel>('standard');
-  const [audience, setAudience] = useState<Audience>('school');
   const [slides, setSlides]           = useState<PresentationSlide[]>(initialSlides ?? []);
   const [pendingAttachment, setPendingAttachment] = useState<PresentationAttachment | null>(attachment ?? null);
   const [selectedAttachmentSlide, setSelectedAttachmentSlide] = useState(1);
@@ -93,8 +85,7 @@ export function PresentationModal({ topic, selectedTemplate, startMode, initialS
   slidesCountRef.current = slidesCount;
   const informationLevelRef = useRef(informationLevel);
   informationLevelRef.current = informationLevel;
-  const audienceRef = useRef(audience);
-  audienceRef.current = audience;
+  const audienceRef = useRef<Audience>('school');
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
 
@@ -548,22 +539,6 @@ export function PresentationModal({ topic, selectedTemplate, startMode, initialS
                   >
                     <strong>{level.title}</strong>
                     <span>{level.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pres-settings-group">
-              <div className="pres-settings-label">Для кого презентация?</div>
-              <div className="pres-audience-grid">
-                {AUDIENCES.map(item => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    className={audience === item.value ? 'active' : ''}
-                    onClick={() => setAudience(item.value)}
-                  >
-                    {item.title}
                   </button>
                 ))}
               </div>

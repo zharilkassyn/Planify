@@ -55,7 +55,9 @@ export function PresentationPreview({
           disabled={activeIndex === 0}
           aria-label="Предыдущий слайд"
         >
-          ‹
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
         </button>
 
         <div className="presentation-stage-slide">
@@ -75,7 +77,9 @@ export function PresentationPreview({
           disabled={activeIndex === slides.length - 1}
           aria-label="Следующий слайд"
         >
-          ›
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
         </button>
       </div>
 

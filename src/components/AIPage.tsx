@@ -152,6 +152,27 @@ function getTypingChunks(text: string): string[] {
   return text.match(/.{1,4}(\s|$)|\S+/g) ?? [text];
 }
 
+function cleanAiResponse(text: string) {
+  const trimmed = text.trim();
+  const quotePairs: [string, string][] = [
+    ['"', '"'],
+    ['“', '”'],
+    ['«', '»'],
+  ];
+
+  for (const [start, end] of quotePairs) {
+    if (trimmed.startsWith(start) && trimmed.endsWith(end)) {
+      return trimmed.slice(start.length, -end.length).trim();
+    }
+  }
+
+  return trimmed;
+}
+
+function getVisibleMessageContent(message: Message) {
+  return message.role === 'ai' ? cleanAiResponse(message.content) : message.content;
+}
+
 function getResponseContext(error: unknown): Response | null {
   if (!error || typeof error !== 'object') return null;
   const maybeError = error as { context?: unknown };
@@ -229,7 +250,7 @@ async function askAi(
   if (data?.error) throw new Error(data.error);
   if (!data?.text?.trim()) throw new Error('ИИ не вернул ответ');
 
-  return data.text.trim();
+  return cleanAiResponse(data.text);
 }
 
 function stripCodeFence(text: string) {
@@ -407,6 +428,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
   const [input,      setInput]      = useState('');
   const [typing,     setTyping]     = useState(false);
   const [attachment, setAttachment] = useState<AiAttachment | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -715,6 +737,14 @@ export function AIPage({ onNavigate }: AIPageProps) {
     saveChats(updated);
   }
 
+  async function copyMessage(message: Message) {
+    await navigator.clipboard.writeText(getVisibleMessageContent(message));
+    setCopiedMessageId(message.id);
+    setTimeout(() => {
+      setCopiedMessageId(current => current === message.id ? null : current);
+    }, 1600);
+  }
+
   function deleteChat(id: string) {
     const updated = chats.filter(c => c.id !== id);
     setChats(updated);
@@ -785,7 +815,7 @@ export function AIPage({ onNavigate }: AIPageProps) {
                 {m.role === 'ai' && !m.content ? (
                   <div className="typing-dots"><span/><span/><span/></div>
                 ) : (
-                  <div className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  <div className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>{getVisibleMessageContent(m)}</div>
                 )}
                 {m.schedule && m.schedule.length > 0 && (
                   <div className="ai-schedule-card">
@@ -818,9 +848,18 @@ export function AIPage({ onNavigate }: AIPageProps) {
                 <div className="msg-time">{m.time}</div>
                 {m.role === 'ai' && (
                   <div className="msg-actions">
-                    <button title="Полезно">👍</button>
-                    <button title="Не полезно">👎</button>
-                    <button title="Копировать" onClick={() => navigator.clipboard.writeText(m.content)}>📋</button>
+                    <button
+                      type="button"
+                      className="msg-copy-btn"
+                      onClick={() => copyMessage(m)}
+                      disabled={!m.content}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      {copiedMessageId === m.id ? 'Скопировано' : 'Копировать'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -863,9 +902,9 @@ export function AIPage({ onNavigate }: AIPageProps) {
             onKeyDown={handleKey}
           />
           <button className="send-btn" onClick={() => send()} disabled={!input.trim() && !attachment}>
-            <svg className="send-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-              <line x1="22" y1="2" x2="11" y2="13"/>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            <svg className="send-icon" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21V3"/>
+              <path d="M3.5 11.5L12 3l8.5 8.5"/>
             </svg>
           </button>
         </div>

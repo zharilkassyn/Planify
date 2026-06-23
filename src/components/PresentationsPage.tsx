@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { PresentationModal, type PresentationAttachment } from './PresentationModal';
 import { TemplateGallery, PRESENTATION_TEMPLATES, type SelectedTemplate } from './TemplateGallery';
 import { createFallbackSlides } from './SlideBuilder';
+import { getPresentationTheme } from './TemplateEngine';
 import type { PresentationSlide } from './LayoutSystem';
 
 const MAX_CHARS = 500;
@@ -62,6 +63,9 @@ const STEPS = [
 const CARD_COLORS = ['#2D6A4F', '#1E3A5F', '#4C1D95', '#92400E', '#1E3A8A', '#065F46'];
 
 const STORAGE_KEY = 'planify_presentations';
+const PRESENTATIONS_DB_NAME = 'planify_presentations_db';
+const PRESENTATIONS_STORE = 'presentation_state';
+const PRESENTATIONS_DB_KEY = 'recent_presentations';
 const SELECTED_TEMPLATE_KEY = 'planify_selected_template';
 const PRESENTATION_DRAFT_KEY = 'planify_presentation_draft_topic';
 
@@ -82,8 +86,116 @@ function loadPresentations(): Presentation[] {
   } catch { return []; }
 }
 
+function stripImagesForLocalStorage(list: Presentation[]): Presentation[] {
+  return list.map(item => ({
+    ...item,
+    slides: item.slides?.map(slide => {
+      if (!slide.imageDataUrl) return slide;
+      const copy = { ...slide };
+      delete copy.imageDataUrl;
+      return copy;
+    }),
+  }));
+}
+
+function openPresentationsDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(PRESENTATIONS_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PRESENTATIONS_STORE)) {
+        db.createObjectStore(PRESENTATIONS_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadPresentationsFromDb(): Promise<Presentation[]> {
+  const db = await openPresentationsDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PRESENTATIONS_STORE, 'readonly');
+    const store = tx.objectStore(PRESENTATIONS_STORE);
+    const request = store.get(PRESENTATIONS_DB_KEY);
+    request.onsuccess = () => {
+      const value = request.result;
+      resolve(Array.isArray(value) ? value as Presentation[] : []);
+    };
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
+}
+
+async function savePresentationsToDb(list: Presentation[]) {
+  const db = await openPresentationsDb();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(PRESENTATIONS_STORE, 'readwrite');
+    const store = tx.objectStore(PRESENTATIONS_STORE);
+    store.put(list, PRESENTATIONS_DB_KEY);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
+}
+
 function savePresentations(list: Presentation[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(stripImagesForLocalStorage(list)));
+  void savePresentationsToDb(list).catch(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripImagesForLocalStorage(list)));
+  });
+}
+
+function hasStoredImages(list: Presentation[]) {
+  return list.some(item => item.slides?.some(slide => Boolean(slide.imageDataUrl)));
+}
+
+function shortenSlideText(text: string | undefined, max: number): string | undefined {
+  if (!text) return text;
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const sentence = clean.split(/[.!?;:]/)[0]?.trim();
+  if (sentence && sentence.length <= max) return sentence;
+  const words = clean.split(' ');
+  let result = '';
+  for (const word of words) {
+    const next = result ? `${result} ${word}` : word;
+    if (next.length > max) break;
+    result = next;
+  }
+  return result || clean.slice(0, max - 1).trim();
+}
+
+function compactStoredSlides(slides: PresentationSlide[]): PresentationSlide[] {
+  return slides.map(slide => ({
+    ...slide,
+    title: shortenSlideText(slide.title, 58) ?? slide.title,
+    subtitle: shortenSlideText(slide.subtitle, 96) ?? slide.subtitle,
+    content: slide.content.map(item => shortenSlideText(item, 52) ?? item).slice(0, 3),
+    stats: slide.stats.map(stat => ({
+      ...stat,
+      label: shortenSlideText(stat.label, 44) ?? stat.label,
+    })).slice(0, 3),
+    comparison: slide.comparison ? {
+      ...slide.comparison,
+      left: slide.comparison.left.map(item => shortenSlideText(item, 48) ?? item).slice(0, 3),
+      right: slide.comparison.right.map(item => shortenSlideText(item, 48) ?? item).slice(0, 3),
+    } : undefined,
+    timeline: slide.timeline.map(item => ({
+      ...item,
+      text: shortenSlideText(item.text, 48) ?? item.text,
+    })).slice(0, 4),
+    quote: shortenSlideText(slide.quote, 112),
+  }));
 }
 
 function isSelectedTemplate(value: unknown): value is SelectedTemplate {
@@ -163,6 +275,20 @@ export function PresentationsPage() {
     localStorage.removeItem(PRESENTATION_DRAFT_KEY);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    loadPresentationsFromDb()
+      .then(stored => {
+        if (!active || stored.length === 0) return;
+        setRecent(current => {
+          if (hasStoredImages(current) && !hasStoredImages(stored)) return current;
+          return stored;
+        });
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
   function findTemplateByName(templateName: string | undefined): SelectedTemplate | null {
     const template = PRESENTATION_TEMPLATES.find(item => item.templateName === templateName);
     return template
@@ -179,7 +305,7 @@ export function PresentationsPage() {
   }
 
   function getPresentationSlides(presentation: Presentation): PresentationSlide[] {
-    if (presentation.slides?.length) return presentation.slides;
+    if (presentation.slides?.length) return compactStoredSlides(presentation.slides);
 
     return createFallbackSlides(
       presentation.title,
@@ -190,13 +316,58 @@ export function PresentationsPage() {
     );
   }
 
+  function renderRecentThumbnail(presentation: Presentation) {
+    const slides = getPresentationSlides(presentation);
+    const firstSlide = slides[0];
+    if (!firstSlide) {
+      return (
+        <div className="recent-presentation-thumb" style={{ background: presentation.bg }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
+      );
+    }
+
+    const theme = getPresentationTheme(getPresentationTemplate(presentation));
+    const thumbStyle = {
+      '--recent-slide-bg': theme.gradient,
+      '--recent-slide-primary': theme.primary,
+      '--recent-slide-accent': theme.accent,
+      '--recent-slide-text': theme.text,
+      '--recent-slide-muted': theme.muted,
+      '--recent-slide-surface': theme.surface,
+    } as CSSProperties;
+
+    return (
+      <div className="recent-presentation-thumb">
+        <div className={`recent-slide-preview${theme.dark ? ' dark' : ''}`} style={thumbStyle}>
+          <div className="recent-slide-preview-chrome">
+            <span>{presentation.title}</span>
+            <span>01 / {String(slides.length).padStart(2, '0')}</span>
+          </div>
+          <div className="recent-slide-preview-copy">
+            <strong>{firstSlide.title}</strong>
+            <span>{firstSlide.subtitle}</span>
+          </div>
+          {firstSlide.imageDataUrl ? (
+            <div
+              className="recent-slide-preview-image"
+              style={{ backgroundImage: `url("${firstSlide.imageDataUrl}")` }}
+              aria-hidden="true"
+            />
+          ) : (
+            <div className="recent-slide-preview-art" aria-hidden="true" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function getSlidesForStorage(slides: PresentationSlide[]): PresentationSlide[] {
-    return slides.map(slide => {
-      if (!slide.imageDataUrl) return slide;
-      const copy = { ...slide };
-      delete copy.imageDataUrl;
-      return copy;
-    });
+    return slides.map(slide => ({ ...slide }));
   }
 
   function handleModalDone(title: string, count: number, slides: PresentationSlide[]) {
@@ -416,6 +587,25 @@ export function PresentationsPage() {
             />
             <button
               type="button"
+              onClick={() => setShowTemplateGallery(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 10,
+                border: `1.5px solid ${primaryColor}`, background: 'var(--card)',
+                color: primaryColor, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                <path d="M12 22a10 10 0 110-20 10 10 0 017.6 16.5c-.8.9-2.1.3-2.1-.9v-.7a2 2 0 00-2-2h-2.2a2.6 2.6 0 00-2.6 2.6v1.8A2.7 2.7 0 0112 22z"/>
+              </svg>
+              Выбрать стиль
+            </button>
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -522,17 +712,7 @@ export function PresentationsPage() {
                   className="panel"
                   style={{ padding: 0, overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
                 >
-                  {/* Thumbnail */}
-                  <div style={{
-                    height: 110, background: r.bg,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
-                      <rect x="2" y="3" width="20" height="14" rx="2"/>
-                      <line x1="8" y1="21" x2="16" y2="21"/>
-                      <line x1="12" y1="17" x2="12" y2="21"/>
-                    </svg>
-                  </div>
+                  {renderRecentThumbnail(r)}
                   {/* Info */}
                   <div style={{ padding: '10px 12px' }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', marginBottom: 4, lineHeight: 1.3 }}>

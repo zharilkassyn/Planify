@@ -37,6 +37,28 @@ const FALLBACK_SLIDES: Array<{ title: string; subtitle: string; content: string[
   { title: 'Главные выводы', subtitle: 'Что нужно запомнить после презентации', content: ['Главная мысль', 'Практическая польза', 'Следующий шаг'], visual: 'Финальный визуальный акцент' },
 ];
 
+function shortenForSlide(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const sentence = clean.split(/[.!?;:]/)[0]?.trim();
+  if (sentence && sentence.length <= max) return sentence;
+  const words = clean.split(' ');
+  let result = '';
+  for (const word of words) {
+    const next = result ? `${result} ${word}` : word;
+    if (next.length > max) break;
+    result = next;
+  }
+  return result || clean.slice(0, max - 1).trim();
+}
+
+function compactList(items: string[], maxItems: number, maxChars: number): string[] {
+  return items
+    .map(item => shortenForSlide(item, maxChars))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 export function createFallbackSlides(
   topic: string,
   count: number,
@@ -102,8 +124,12 @@ function normalizeSlideDraft(
   informationLevel: InformationLevel,
 ): PresentationSlide {
   const fallback = FALLBACK_SLIDES[idx % FALLBACK_SLIDES.length];
-  const contentLimit = informationLevel === 'brief' ? 3 : informationLevel === 'detailed' ? 5 : 4;
-  const content = sanitizeList('content' in slide ? slide.content : undefined, fallback.content).slice(0, contentLimit);
+  const contentLimit = informationLevel === 'brief' ? 3 : informationLevel === 'detailed' ? 4 : 3;
+  const content = compactList(
+    sanitizeList('content' in slide ? slide.content : undefined, fallback.content),
+    contentLimit,
+    52,
+  );
   const layout = normalizeLayout('layout' in slide ? slide.layout : undefined, idx, total);
   const title = typeof slide.title === 'string' && slide.title.trim() ? slide.title.trim() : fallback.title;
   const subtitle = typeof slide.subtitle === 'string' && slide.subtitle.trim() ? slide.subtitle.trim() : fallback.subtitle;
@@ -119,8 +145,8 @@ function normalizeSlideDraft(
   return {
     id: idx + 1,
     number: idx + 1,
-    title: title.slice(0, 92),
-    subtitle: subtitle.slice(0, 170),
+    title: shortenForSlide(title, 58),
+    subtitle: shortenForSlide(subtitle, 96),
     content,
     layout,
     visual,
@@ -129,7 +155,7 @@ function normalizeSlideDraft(
     stats: normalizeStats(slide, content),
     comparison: normalizeComparison(slide, content),
     timeline: normalizeTimeline(slide, content),
-    quote: typeof rawQuote === 'string' ? rawQuote.slice(0, 170) : subtitle,
+    quote: typeof rawQuote === 'string' ? shortenForSlide(rawQuote, 112) : shortenForSlide(subtitle, 112),
     attribution: typeof rawAttribution === 'string' ? rawAttribution.slice(0, 60) : topic,
   };
 }
@@ -140,7 +166,7 @@ function normalizeStats(slide: AiSlideDraft | { content: string[] }, content: st
     .filter((item): item is { value?: unknown; label?: unknown } => Boolean(item && typeof item === 'object'))
     .map(item => ({
       value: typeof item.value === 'string' ? item.value.slice(0, 12) : '3x',
-      label: typeof item.label === 'string' ? item.label.slice(0, 52) : 'важный показатель',
+      label: typeof item.label === 'string' ? shortenForSlide(item.label, 44) : 'важный показатель',
     }))
     .slice(0, 3);
   return stats.length ? stats : content.slice(0, 3).map((item, idx) => ({ value: ['3', '7', '90%'][idx] ?? `${idx + 1}`, label: item }));
@@ -152,7 +178,7 @@ function normalizeTimeline(slide: AiSlideDraft | { content: string[] }, content:
     .filter((item): item is { label?: unknown; text?: unknown } => Boolean(item && typeof item === 'object'))
     .map((item, idx) => ({
       label: typeof item.label === 'string' ? item.label.slice(0, 18) : `Этап ${idx + 1}`,
-      text: typeof item.text === 'string' ? item.text.slice(0, 72) : content[idx] ?? 'Ключевой этап',
+      text: typeof item.text === 'string' ? shortenForSlide(item.text, 48) : content[idx] ?? 'Ключевой этап',
     }))
     .slice(0, 4);
   return timeline.length ? timeline : content.slice(0, 4).map((item, idx) => ({ label: `Этап ${idx + 1}`, text: item }));
@@ -164,9 +190,9 @@ function normalizeComparison(slide: AiSlideDraft | { content: string[] }, conten
     const maybe = comparison as { leftTitle?: unknown; left?: unknown; rightTitle?: unknown; right?: unknown };
     return {
       leftTitle: typeof maybe.leftTitle === 'string' ? maybe.leftTitle.slice(0, 36) : 'Подход A',
-      left: sanitizeList(maybe.left, content.slice(0, 3)),
+      left: compactList(sanitizeList(maybe.left, content.slice(0, 3)), 3, 48),
       rightTitle: typeof maybe.rightTitle === 'string' ? maybe.rightTitle.slice(0, 36) : 'Подход B',
-      right: sanitizeList(maybe.right, content.slice(1, 4)),
+      right: compactList(sanitizeList(maybe.right, content.slice(1, 4)), 3, 48),
     };
   }
 
