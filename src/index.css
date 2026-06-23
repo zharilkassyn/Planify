@@ -10919,31 +10919,22 @@ button.ghost {
    RESPONSIVE — MOBILE (≤768px)
 ═══════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* ── Hide desktop sidebar entirely ── */
+  /* ── Keep the main sidebar on phones too ── */
   .sidebar {
-    display: none !important;
+    display: flex !important;
+    width: 68px;
   }
 
-  /* ── Main content: full width, bottom padding for nav bar ── */
+  /* ── Main content: shifted for the left sidebar ── */
   .main-content {
-    margin-left: 0 !important;
-    padding: 16px 16px 84px;
+    margin-left: 68px !important;
+    padding: 16px;
     min-height: 100vh;
   }
 
-  /* ── Show bottom nav ── */
+  /* ── Bottom nav is disabled; navigation stays on the left ── */
   .bottom-nav {
-    display: block;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 500;
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
-    /* Safe area for notched phones */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: none !important;
   }
 
   .bottom-nav-inner {
@@ -11423,7 +11414,7 @@ button.ghost {
   .main-content:has(.notes-layout) {
     height: auto;
     overflow: visible;
-    padding: 16px 16px 84px;
+    padding: 16px;
   }
 
   .notes-layout {
@@ -11809,7 +11800,8 @@ button.ghost {
 ═══════════════════════════════════════════════════ */
 @media (max-width: 480px) {
   .main-content {
-    padding: 12px 12px 80px;
+    margin-left: 68px !important;
+    padding: 12px;
   }
 
   /* Widget padding */
@@ -11833,7 +11825,11 @@ button.ghost {
     font-size: 16px;
   }
 
-  /* Bottom nav labels: hide on tiny screens */
+  /* Bottom nav remains hidden because mobile uses the left sidebar */
+  .bottom-nav {
+    display: none !important;
+  }
+
   .bottom-nav-label {
     display: none;
   }
