@@ -8234,6 +8234,11 @@ button.ghost {
   background: #FAFAFA !important;
 }
 
+[data-theme="dark"] .sidebar-logo-icon svg,
+[data-theme="dark"] .sidebar-logo-icon svg * {
+  stroke: #050505 !important;
+}
+
 [data-theme="dark"] .games-header p,
 [data-theme="dark"] .games-hero p,
 [data-theme="dark"] .game-copy p,
@@ -10922,14 +10927,58 @@ button.ghost {
   /* ── Keep the main sidebar on phones too ── */
   .sidebar {
     display: flex !important;
+    width: min(220px, 78vw);
+    z-index: 700;
+  }
+
+  .sidebar.sidebar-collapsed {
     width: 68px;
+  }
+
+  .sidebar-logo {
+    justify-content: space-between;
+    padding: 0 14px 20px;
+  }
+
+  .sidebar-logo-collapsed {
+    justify-content: center;
+  }
+
+  .sidebar-toggle-btn {
+    display: flex !important;
+  }
+
+  .sidebar:not(.sidebar-collapsed) .sidebar-logo-text,
+  .sidebar:not(.sidebar-collapsed) .nav-label,
+  .sidebar:not(.sidebar-collapsed) .user-name,
+  .sidebar:not(.sidebar-collapsed) .user-role,
+  .sidebar:not(.sidebar-collapsed) .signout-btn {
+    display: block;
+  }
+
+  .sidebar:not(.sidebar-collapsed) .sidebar-nav {
+    padding: 20px 12px;
+  }
+
+  .sidebar:not(.sidebar-collapsed) .nav-item {
+    justify-content: flex-start;
+    padding: 11px 14px;
+  }
+
+  .sidebar:not(.sidebar-collapsed) .sidebar-bottom {
+    padding: 16px 12px;
+    align-items: stretch;
   }
 
   /* ── Main content: shifted for the left sidebar ── */
   .main-content {
-    margin-left: 68px !important;
+    margin-left: min(220px, 78vw) !important;
     padding: 16px;
     min-height: 100vh;
+  }
+
+  .app-layout:has(.sidebar-collapsed) .main-content {
+    margin-left: 68px !important;
   }
 
   /* ── Bottom nav is disabled; navigation stays on the left ── */
@@ -11800,8 +11849,12 @@ button.ghost {
 ═══════════════════════════════════════════════════ */
 @media (max-width: 480px) {
   .main-content {
-    margin-left: 68px !important;
+    margin-left: min(220px, 78vw) !important;
     padding: 12px;
+  }
+
+  .app-layout:has(.sidebar-collapsed) .main-content {
+    margin-left: 68px !important;
   }
 
   /* Widget padding */
